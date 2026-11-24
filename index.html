@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Fazenda Orbital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div id="app">
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="crosshair"></div>
+  <div id="flash" class="flash"></div>
+
+  <div class="hud-card top-left">
+    <div class="money-row">
+      <i data-icon="coin"></i><b id="money">120</b><span class="cur">CR</span>
+      <span class="lvl">Nv <b id="level">1</b></span>
+    </div>
+    <div class="xp"><div id="xpFill"></div></div>
+    <div class="meter water"><div class="fill" id="waterFill"></div><span><i data-icon="drop"></i>Agua <b id="water">10 / 10</b></span></div>
+    <div class="meter energy"><div class="fill" id="energyFill"></div><span><i data-icon="bolt"></i>Energia <b id="energy">20 / 100</b></span></div>
+    <div class="mini"><span>PP <b id="rp">0</b></span><span>REP <b id="rep">0</b></span><span id="crystalRow" class="hidden">CRIST <b id="crystals">0</b></span></div>
+  </div>
+
+  <div id="objective"><span class="obj-label">Meta</span><span id="objectiveText">Plante 3 alfaces na fazenda</span></div>
+
+  <div class="top-right">
+    <div id="clock">Dia 1 - 08:00</div>
+    <div id="zone">FAZENDA</div>
+    <div class="chips">
+      <div class="chip hidden" id="chip-drone"><i data-icon="drone"></i><span id="ind-drone"></span></div>
+      <div class="chip hidden" id="chip-weather"><i data-icon="cloud"></i><span id="ind-weather"></span></div>
+      <div class="chip hidden" id="chip-contracts"><i data-icon="scroll"></i><span id="ind-contracts"></span></div>
+      <div class="chip hidden" id="chip-stock"><i data-icon="box"></i><span id="ind-stock"></span></div>
+      <div class="chip hidden good" id="chip-net"><i data-icon="users"></i><span id="ind-net"></span></div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+  <div id="eventBanner" class="event-banner hidden"></div>
+
+  <div id="prompt" class="hidden">Pressione E</div>
+  <div id="buildHint" class="hidden"></div>
+  <div id="hotbarWrap">
+    <div id="slotName"></div>
+    <div id="hotbar"></div>
+  </div>
+  <div id="keyHelp">E interagir - Tab hotbar - I inventario - G drones - C contratos - P pausa - H esconder ajuda</div>
+</div>
+
+<div id="modalBackdrop" class="hidden"></div>
+<div id="modal" class="panel hidden">
+  <div class="modal-head"><h3 id="modalTitle">Janela</h3><button id="modalClose" type="button" aria-label="Fechar">FECHAR</button></div>
+  <div id="modalBody"></div>
+  <p id="modalHint" class="hint"></p>
+</div>
+<button id="resume" class="hidden" type="button">Clique para continuar</button>
+
+<div id="login" class="screen hidden">
+  <div class="menu-card auth">
+    <h1>Fazenda Orbital</h1>
+    <div class="seg auth-tabs"><button id="tabLogin" type="button" class="active">Entrar</button><button id="tabRegister" type="button">Criar conta</button></div>
+    <form id="authForm" autocomplete="on">
+      <label>Nick<input id="authNick" maxlength="16" autocomplete="username" spellcheck="false" placeholder="seu nick"/></label>
+      <label>Senha<input id="authPass" type="password" autocomplete="current-password" placeholder="sua senha"/></label>
+      <label id="authPass2Row" class="hidden">Repetir senha<input id="authPass2" type="password" autocomplete="new-password" placeholder="repita a senha"/></label>
+      <label class="check"><input id="authRemember" type="checkbox" checked/> Manter conectado neste navegador</label>
+      <p id="authMsg" class="auth-msg"></p>
+      <button id="authSubmit" type="submit">Entrar</button>
+    </form>
+    <p class="fine">Sem email. As contas ficam salvas neste navegador e nao ha recuperacao de senha.</p>
+  </div>
+</div>
+
+<div id="menu" class="screen hidden">
+  <div class="menu-card">
+    <h1>Fazenda Orbital</h1>
+    <div id="accountBar"><span>Conta <b id="accountName">-</b></span><button id="logoutBtn" type="button" class="link">Trocar de conta</button></div>
+    <p>Plante, regue e colha com drones, pesquise, cumpra contratos e descubra a Ilha Cristalina.</p>
+    <button id="startBtn" type="button">Jogar</button>
+    <button id="mpBtn" type="button" class="secondary">Multiplayer</button>
+    <div class="row2">
+      <button id="settingsBtn" type="button" class="secondary">Configuracoes</button>
+      <button id="resetBtn" type="button" class="secondary">Apagar progresso</button>
+    </div>
+    <div class="controls">
+      <span>WASD mover</span><span>Mouse olhar</span><span>E interagir</span><span>1-9 e Tab hotbar</span><span>I inventario</span><span>G drones</span><span>C contratos</span><span>P pausa</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
