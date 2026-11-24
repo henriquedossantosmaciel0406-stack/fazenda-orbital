@@ -1,14 +1,16 @@
 # Fazenda Orbital
 
-Jogo 3D em primeira pessoa, low-poly, que roda direto no navegador (Three.js via CDN).
-Abra pelo servidor local (recomendado, por causa dos modulos ES):
+Jogo de fazenda em primeira pessoa, feito em Three.js para navegador de computador.
 
-```
-cd fazenda-orbital
-python3 -m http.server 8000
-```
+## Abrir o jogo e jogar com amigos
 
-e acesse http://localhost:8000. Na primeira abertura e necessaria internet (Three.js e a fonte vem de CDN).
+1. Extraia o ZIP. No computador que vai hospedar, use Node.js 18 ou mais recente.
+2. Na pasta que contém `index.html`, execute `node server.cjs`. No Windows também pode abrir `Jogar.cmd`.
+3. Abra `http://localhost:8000` no computador anfitrião. Nos outros computadores da mesma rede, abra o endereço indicado como **Na mesma rede** no terminal.
+4. Cada jogador entra em seu perfil local. Um deles escolhe **Multiplayer → Criar sala**. Os outros abrem **Multiplayer → Entrar com código** e digitam os seis caracteres. Feche a janela Multiplayer e clique em **Jogar** ou **Continuar**.
+5. Durante a partida, pressione **P → Multiplayer** para visitar uma fazenda ou enviar um presente. A sala comporta o anfitrião e três convidados. Mantenha o terminal e a aba do anfitrião abertos.
+
+O servidor incluído transmite os dados por WebSocket. Jogo, fonte e bibliotecas vêm no ZIP. Se o Windows solicitar acesso à rede, permita na rede privada usada para jogar. A porta padrão é 8000 e pode ser alterada com a variável de ambiente `PORT`. Para jogadores em redes diferentes, hospede esse mesmo servidor em um serviço Node com HTTPS e suporte a WebSocket e compartilhe a URL. Todos os participantes precisam abrir o mesmo servidor.
 
 ## Controles
 
@@ -94,20 +96,20 @@ Controles novos: Tab troca a pagina da hotbar; 1 a 9 escolhem o item da pagina a
 
 **HUD limpo**: so creditos, nivel, agua, energia e a meta ficam fixos. Drones, clima, contratos prontos, estoque cheio e sala aparecem so quando ha algo a mostrar. Hotbar compacta (nome do item aparece ao trocar). Ajuda de teclas some sozinha; H mostra/esconde.
 
-**Contas**: nick (3 a 16 letras, numeros, _ ou -) e senha (minimo 4). Sem email. Cada conta tem o proprio save. A primeira conta criada herda o progresso salvo antes das contas. "Trocar de conta" fica no menu. Atencao: as contas ficam salvas no navegador (senha com PBKDF2 quando o navegador permite); nao ha servidor nem recuperacao de senha.
+**Contas**: nick (3 a 16 letras, numeros, _ ou -) e senha (minimo 4). Sem email. Cada conta tem o proprio save. A primeira conta criada herda o progresso salvo antes das contas. "Trocar de conta" fica no menu. Atencao: as contas ficam salvas no navegador (senha com PBKDF2 quando o navegador permite); o servidor de salas não armazena os perfis.
 
 **Multiplayer**: menu Multiplayer (ou Pausa > Multiplayer).
 - Criar sala: gera um codigo de 6 caracteres. Passe aos amigos.
 - Entrar: digite o codigo.
 - Ate 4 jogadores. Cada um joga na propria fazenda; as fazendas dos outros aparecem em terrenos ao redor da cidade (leste, sul e sudeste), com plantas, arvores e construcoes sincronizadas. Voce ve os outros jogadores andando pela cidade, com o nick acima da cabeca.
-- Conexao direta entre navegadores (WebRTC via PeerJS, carregado do unpkg; usa o servidor publico de sinalizacao do PeerJS). Em redes muito restritivas pode falhar.
+- Na hospedagem estática, o jogo utiliza WebRTC e a sinalização pública do PeerJS. O servidor incluído usa salas próprias e funciona inclusive em uma LAN sem internet.
 - Teste local: abra duas abas com `index.html?net=local` (mesmo navegador) para simular a sala sem internet.
 
 ## Presentes entre amigos
 Multiplayer > Dar presente (ao lado do nick do amigo): creditos, sementes, mudas, colheitas, frutos, mutantes, produtos e cristais. O item sai do seu inventario ao enviar e e devolvido se o amigo recusar (estoque cheio) ou sair da sala.
 
 ## Publicar na Vercel
-O jogo e estatico (sem build). Suba a pasta como esta e use "Other / no framework", sem comando de build, diretorio de saida na raiz. Em HTTPS o hash de senha usa PBKDF2 e o WebRTC funciona normalmente. O PeerJS agora vem junto em js/vendor/peerjs.min.js (usa o servidor publico de sinalizacao 0.peerjs.com e os servidores STUN/TURN publicos do PeerJS). Contas e saves ficam no navegador de cada jogador (localStorage por dominio), nao sincronizam entre aparelhos.
+Para a versão estática, selecione “Other”, deixe o comando de build vazio e use a pasta de `index.html` como raiz. Nesse modo, o botão Multiplayer usa a biblioteca PeerJS incluída e depende de sinalização pública e da rede dos jogadores. Para usar o servidor de salas incluído pela internet, publique o projeto em uma hospedagem Node persistente com o comando `node server.cjs`. Na versão estática, abra **Multiplayer → Servidor de salas**, informe a URL HTTPS dessa hospedagem e clique em **Aplicar** nos dois navegadores. Assim os jogadores da Vercel também podem usar o servidor de salas. Os dois modos de transporte têm salas independentes. Contas e saves continuam locais a cada navegador e endereço.
 
 ## Sala: relogio, clima e como achar amigos
 - Dentro da sala todos seguem o relogio e o clima do host (dia/noite, chuva, seca e mercado em alta iguais para todos). Convidados nao sorteiam eventos proprios.
@@ -126,7 +128,7 @@ O jogo e estatico (sem build). Suba a pasta como esta e use "Other / no framewor
 - Eventos novos: Arco-iris (+25% crescimento), Festival da colheita (+25% preco), Mercador viajante (sementes gratis).
 - Decoracoes novas animadas: Moinho de vento, Espantalho, Lago com lotus, Balao flutuante.
 - Login: caixa "Manter conectado" (guarda nick + verificador, nunca a senha). "Trocar de conta" desliga. `?relogin` na URL forca a tela de login.
-- Multiplayer: usa o servidor publico de sinalizacao do PeerJS; os jogadores precisam de internet para conectar (depois o trafego e direto entre eles, mesma rede ou nao).
+- O modo WebRTC da hospedagem estática precisa de internet para localizar a sala.
 
 ## Update 9
 - Postes de luz agora ficam nas laterais da estrada (antes cruzavam a pista).

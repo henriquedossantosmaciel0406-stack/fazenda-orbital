@@ -1,3 +1,4 @@
+@font-face{font-family:'Baloo 2';src:url('./assets/fonts/baloo-2-latin.woff2') format('woff2');font-weight:400 800;font-display:swap}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--mint:#7ED957;--cyan:#4FE3C1;--yellow:#FFD166;--red:#FF5470;--blue:#4FC3F7;--orange:#FFB74D;--violet:#B26BFF;--panel:rgba(14,20,30,.82);--border:rgba(255,255,255,.16);--text:#F7FBFF}
 html,body{height:100%;overflow:hidden;font-family:'Baloo 2',system-ui,sans-serif;color:var(--text);background:#0b1020}

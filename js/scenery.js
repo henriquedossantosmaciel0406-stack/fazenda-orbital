@@ -1,3 +1,4 @@
+import { butterfly, skyBird } from './wildlife.js';
 // Cenario vivo: ceu com sol e lua, grama e flores ao vento, vagalumes, borboletas, passaros e arco-iris.
 // Tudo instanciado ou em shader (barato). O vento e um uniforme unico compartilhado.
 import * as THREE from 'three';
@@ -179,26 +180,12 @@ export function initScenery(scene, camera, world) {
   rb.position.set(-60, -2, -210); rb.rotation.y = 0.35; rb.visible = false; scene.add(rb); rainbow = rb;
 
   // --- Borboletas (dia) e passaros (dia) ---
-  const upG = new THREE.CircleGeometry(0.2, 12); upG.scale(1, 0.85, 1); upG.translate(0.2, 0.09, 0);
-  const loG = new THREE.CircleGeometry(0.13, 10); loG.translate(0.13, -0.12, 0);
-  const dotG = new THREE.CircleGeometry(0.05, 8); dotG.translate(0.24, 0.1, 0.002);
-  const bodyG = new THREE.CylinderGeometry(0.025, 0.02, 0.34, 5); bodyG.rotateX(Math.PI / 2);
-  const bodyM = new THREE.MeshBasicMaterial({ color: 0x2B2038 });
-  const bcols = [[0xFF8AD0, 0xFFF3FA], [0xFFD166, 0x7A3F00], [0x7FDBFF, 0xFFFFFF], [0xFFA45C, 0x3A1A00], [0xB48CFF, 0xFFFFFF]];
-  for (let i = 0; i < 10; i++) {
-    const [c1, c2] = bcols[i % bcols.length];
-    const g = new THREE.Group(), m1 = new THREE.MeshBasicMaterial({ color: c1, side: THREE.DoubleSide }), m2 = new THREE.MeshBasicMaterial({ color: c2, side: THREE.DoubleSide });
-    const mkWing = side => { const w = new THREE.Group(); w.add(new THREE.Mesh(upG, m1), new THREE.Mesh(loG, m1), new THREE.Mesh(dotG, m2)); w.scale.x = side; return w; };
-    const l = mkWing(1), r = mkWing(-1), body = new THREE.Mesh(bodyG, bodyM);
-    const inner = new THREE.Group(); inner.rotation.x = Math.PI / 2; inner.add(l, r); // asas no plano horizontal em repouso
-    const rig = new THREE.Group(); rig.add(body, inner); rig.scale.setScalar(1.5); g.add(rig); scene.add(g);
+  for (let i=0;i<10;i++) {
+    const {g,l,r}=butterfly(i); scene.add(g);
     critters.push({ kind: 'fly', g, l, r, cx: (rnd() - 0.5) * 80, cz: (rnd() - 0.5) * 80 - 10, ph: rnd() * 10, sp: 0.2 + rnd() * 0.25, rad: 4 + rnd() * 8, h: 1.0 + rnd() * 1.6 });
   }
-  const birdMat = new THREE.MeshBasicMaterial({ color: 0x2B2E4A, side: THREE.DoubleSide });
-  const bw = new THREE.PlaneGeometry(1.5, 0.5); bw.translate(0.75, 0, 0);
-  for (let i = 0; i < 6; i++) {
-    const g = new THREE.Group(), l = new THREE.Mesh(bw, birdMat), r = new THREE.Mesh(bw, birdMat); r.scale.x = -1;
-    g.add(l, r); scene.add(g);
+  for(let i=0;i<6;i++) {
+    const {g,l,r}=skyBird(); scene.add(g);
     critters.push({ kind: 'bird', g, l, r, ph: rnd() * 10, sp: 0.07 + rnd() * 0.05, rad: 60 + rnd() * 70, h: 38 + rnd() * 24, dir: rnd() > 0.5 ? 1 : -1 });
   }
   world.rainbow = rainbow;
@@ -249,8 +236,10 @@ export function updateScenery(dt, t, ang, camera, sun, wv, rainbowOn, rainAmt) {
     if (c.kind === 'fly') {
       const x = c.cx + Math.cos(a) * c.rad + Math.sin(a * 2.3) * 1.5, z = c.cz + Math.sin(a * 1.2) * c.rad * 0.7;
       c.g.position.set(x, c.h + Math.sin(a * 3) * 0.4, z);
-      c.g.rotation.y = -a + Math.PI / 2;
-      const f = 0.2 + (Math.sin(t * 15 + c.ph) * 0.5 + 0.5) * 1.1; c.l.rotation.y = -f; c.r.rotation.y = f;
+      const dx=-Math.sin(a)*c.rad+3.45*Math.cos(a*2.3), dz=Math.cos(a*1.2)*0.84*c.rad;
+      c.g.rotation.y = Math.atan2(-dx,-dz);
+      c.g.rotation.z = 0.21*Math.sin(a*2.3);
+      const f = 0.2 + (Math.sin(t * 15 + c.ph) * 0.5 + 0.5) * 1.1; c.l.rotation.z = f; c.r.rotation.z = -f;
     } else {
       const aa = a * c.dir;
       c.g.position.set(cx * 0.3 + Math.cos(aa) * c.rad, c.h + Math.sin(aa * 2) * 2, cz * 0.3 + Math.sin(aa) * c.rad);

@@ -25,15 +25,21 @@ export const droneCost = () => D.prices[Math.min(state.drones.length, D.prices.l
 function createDroneModel() {
   const g = new THREE.Group();
   const white = mat(0xE8F0F7, { metalness: 0.4, roughness: 0.4 }), dark = mat(0x2E3A4D, { metalness: 0.5 });
-  const body = new THREE.Mesh(geo('ico', 0.38, 1), white); body.scale.y = 0.7; g.add(body); addOutline(body, 0.025);
+  const body = new THREE.Mesh(geo('sph', 0.38, 12, 8), mat(0xEDBA69)); body.scale.set(1.03,0.71,1.22); g.add(body); addOutline(body, 0.025);
   const dome = new THREE.Mesh(geo('sph', 0.26, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x59E6FF, { transparent: true, opacity: 0.65, emissive: 0x59E6FF, emissiveIntensity: 0.4 }));
   dome.position.y = 0.12; g.add(dome);
   const basket = new THREE.Mesh(geo('box', 0.34, 0.12, 0.34), dark); basket.position.y = -0.27; g.add(basket);
+  for(const side of [-1,1]) {
+    const skid=new THREE.Mesh(geo('box',0.09,0.09,0.68),dark);skid.position.set(side*0.23,-0.33,0);g.add(skid);
+    const eye=new THREE.Mesh(geo('sph',0.08,10,6),mat(0x263D4B));eye.position.set(side*0.15,0.04,0.39);g.add(eye);
+  }
   const rotors = [];
   [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz]) => {
     const arm = new THREE.Mesh(geo('box', 0.88, 0.06, 0.07), dark);
     arm.position.set(sx * 0.31, 0.02, sz * 0.31); arm.rotation.y = Math.atan2(-sz, sx); g.add(arm);
     const motor = new THREE.Mesh(geo('cyl', 0.09, 0.09, 0.12, 8), dark); motor.position.set(sx * 0.62, 0.1, sz * 0.62); g.add(motor);
+    const guard=new THREE.Mesh(geo('tor',0.35,0.035,5,16),white);guard.rotation.x=Math.PI/2;
+    guard.position.set(sx*0.62,0.18,sz*0.62);g.add(guard);
     const rotor = new THREE.Group(); rotor.position.set(sx * 0.62, 0.19, sz * 0.62);
     const b1 = new THREE.Mesh(geo('box', 0.62, 0.02, 0.07), dark), b2 = new THREE.Mesh(geo('box', 0.62, 0.02, 0.07), dark);
     b2.rotation.y = Math.PI / 2;

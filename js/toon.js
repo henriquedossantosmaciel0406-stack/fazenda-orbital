@@ -63,7 +63,7 @@ export function addOutline(mesh, thickness) {
   let og = outlineCache.get(geom);
   if (!og) { og = inflated(geom, t); outlineCache.set(geom, og); }
   const o = new THREE.Mesh(og, outlineMat);
-  o.castShadow = false; o.receiveShadow = false; o.userData.outline = true;
+  o.castShadow = false; o.receiveShadow = false; o.userData.outline = true; o.userData.ownedGeometry = !!mesh.userData.ownedGeometry;
   mesh.add(o);
   return o;
 }

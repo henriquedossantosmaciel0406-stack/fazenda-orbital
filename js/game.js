@@ -1,3 +1,6 @@
+import {createWateringCan} from './watering-can.js';
+import { initWater, updateWater, waterJet } from './water.js';
+import { fillCrop, fillTree, varySpecimen } from './botany.js';
 // Orquestrador do jogo: canteiros, mutacoes, arvores, terreno, irrigadores, interacao, lojas, mercado,
 // construcao, recursos, dia/noite e visitantes. Os sistemas (drones, pesquisa, contratos, eventos)
 // recebem apenas as APIs necessarias, sem importacao circular.
@@ -40,6 +43,7 @@ const trees = [];     // arvores: { data, group, mesh, stageKey, dirty }
 let irrigators = [];
 const fx = { rain: 0, reactor: 0 };
 let build = null; // modo construcao { type | tree, x, z, reason }
+let wateringCan;
 const ghosts = {}, treeGhosts = {};
 let ghostRing, ringOk, ringBad;
 const pickupMeshes = new Map();
@@ -51,8 +55,6 @@ let clock = 0, hudTimer = 0, saveTimer = 0, achTimer = 0, zoneTimer = 0, availTi
 const dirV = new THREE.Vector3(), tmpV = new THREE.Vector3();
 const bgTmp = new THREE.Color();
 const target = { type: null, ref: null, text: '' };
-const mixCol = new THREE.Color(), mixCol2 = new THREE.Color();
-const mixHex = (a, b, t) => mixCol.setHex(a).lerp(mixCol2.setHex(b), t).getHex();
 
 // ======================================================================
 //  MUTACOES
@@ -79,10 +81,14 @@ export function plotGeometry(kind) {
       const soil = new THREE.Mesh(geo('box', 3.4, 0.4, 3.4), mat(SOIL_COL[kind]));
       border.position.y = 0.12; soil.position.y = 0.2;
       tmp.add(border, soil);
+      for (let i=0;i<5;i++) {
+        const ridge=new THREE.Mesh(geo('cyl',0.065,0.065,2.96,6),mat(kind==='island'?0x77659C:0x956143));
+        ridge.rotation.x=Math.PI/2;ridge.position.set((i-2)*0.61,0.39,0);tmp.add(ridge);
+      }
       if (kind === 'tower') {
         const post = geo('cyl', 0.08, 0.1, 2.2, 6), pm = mat(0xC9D8E4, { metalness: 0.4 });
         [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]].forEach(([px, pz]) => { const p = new THREE.Mesh(post, pm); p.position.set(px, 1.1, pz); tmp.add(p); });
-        const frame = new THREE.Mesh(geo('box', 3.5, 0.08, 3.5), glow(0x4FE3C1)); frame.position.y = 2.2; tmp.add(frame);
+        for(const side of [-1,1]) for(const axis of ['x','z']) {const bar=new THREE.Mesh(geo('box',3.5,0.09,0.09),mat(0x4FE3C1));bar.position.y=2.2;bar.position[axis]=side*1.7;if(axis==='x')bar.rotation.y=Math.PI/2;tmp.add(bar);}
       }
     });
   }
@@ -125,185 +131,11 @@ function refreshAvailability(announce) {
 
 // ---------- Modelos de plantas ----------
 // Montados num grupo temporario e fundidos em UMA malha (cache por estagio): 1 draw call por canteiro.
-function fillCrop(P, key, g, ready, sick, mut) {
-  const c = CONFIG.crops[key];
-  const s = 0.35 + 0.65 * g;
-  const base = mut ? mixHex(c.color, mut.color, 0.55) : c.color;
-  const col = sick ? 0x9A8B3A : base, green = sick ? 0x7A6A3A : 0x4FBF68;
-  const E = ready ? 0.45 : 0.15;
-  const mk = (gm, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(gm, m); o.position.set(x, y, z); P.add(o); return o; };
-  const lit = (color, e) => mat(color, { emissive: color, emissiveIntensity: e });
-  switch (key) {
-    case 'lettuce': {
-      const dk = mat(sick ? 0x7A6A3A : mixHex(col, 0x1F6B30, 0.35)), lt = mat(sick ? 0x9A8B3A : mixHex(col, 0xFFF6A0, 0.35));
-      for (let ring = 0; ring < 2; ring++) {
-        const n = ring ? 5 : 7;
-        for (let i = 0; i < n; i++) {
-          const a = i / n * Math.PI * 2 + ring * 0.4, r = (ring ? 0.2 : 0.38) * s;
-          const leaf = mk(geo('sph', 0.34, 8, 6), ring ? lt : (i % 2 ? dk : mat(col)), Math.cos(a) * r, 0.14 + ring * 0.12 + 0.06 * s, Math.sin(a) * r);
-          leaf.scale.set(s * (ring ? 0.8 : 1), (ring ? 0.5 : 0.35) * s, 0.85 * s); leaf.rotation.y = -a; leaf.rotation.z = ring ? 0.5 : 0.28;
-        }
-      }
-      mk(geo('sph', 0.26, 8, 6), ready ? lit(mixHex(col, 0xFFF6A0, 0.5), 0.3) : lt, 0, 0.26 + 0.12 * s, 0).scale.setScalar(s);
-      break;
-    }
-    case 'strawberry': {
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const lf = mk(geo('ico', 0.28, 1), mat(i % 2 ? green : mixHex(green, 0x1F6B30, 0.3)), Math.cos(a) * 0.38 * s, 0.2 + 0.14 * s, Math.sin(a) * 0.38 * s); lf.scale.set(1.1 * s, 0.35 * s, 0.8 * s); lf.rotation.y = -a; lf.rotation.z = 0.25; }
-      mk(geo('ico', 0.3, 1), mat(green), 0, 0.28 * s + 0.1, 0).scale.set(s, 0.7 * s, s);
-      const n = Math.floor(g * 6);
-      for (let i = 0; i < n; i++) {
-        const a = i / 6 * Math.PI * 2 + 0.4, x = Math.cos(a) * 0.5 * s, z = Math.sin(a) * 0.5 * s, y = 0.26 + 0.07 * (i % 2);
-        if (ready || g > 0.7) {
-          mk(geo('cone', 0.13, 0.28, 8), lit(col, ready ? 0.35 : 0.1), x, y, z).rotation.x = Math.PI;
-          mk(geo('ico', 0.07, 0), mat(0x3FAF5A), x, y + 0.14, z).scale.set(1.4, 0.4, 1.4);
-          for (let k = 0; k < 3; k++) mk(geo('sph', 0.018, 4, 3), glow(0xFFF3A0), x + Math.cos(k * 2.1) * 0.07, y + 0.02 - k * 0.03, z + Math.sin(k * 2.1) * 0.07);
-        } else mk(geo('sph', 0.1, 8, 6), mat(0xBFE08A), x, y, z);
-      }
-      if (g < 0.6) for (let i = 0; i < 2; i++) mk(geo('sph', 0.07, 6, 5), glow(0xFFFFFF), (i ? 0.3 : -0.25) * s, 0.4 * s + 0.1, (i ? -0.2 : 0.25) * s);
-      break;
-    }
-    case 'carrot': {
-      const n = 8;
-      for (let i = 0; i < n; i++) {
-        const a = i / n * Math.PI * 2 + (i % 2) * 0.2, h = (0.5 + 0.55 * s) * (0.75 + 0.25 * (i % 3) / 2);
-        const leaf = mk(geo('cone', 0.07, 1, 4), mat(i % 2 ? green : mixHex(green, 0x8AE08A, 0.3)), Math.cos(a) * 0.12 * s, 0.15 + h * 0.42, Math.sin(a) * 0.12 * s);
-        leaf.rotation.z = Math.cos(a) * 0.55; leaf.rotation.x = -Math.sin(a) * 0.55; leaf.scale.y = h;
-        mk(geo('sph', 0.06, 5, 4), mat(0x6BE08A), Math.cos(a) * (0.12 + h * 0.4) * s, 0.15 + h * 0.85, Math.sin(a) * (0.12 + h * 0.4) * s).scale.set(1.6, 0.5, 1.6);
-      }
-      const root = mk(geo('cone', 0.2, 0.62, 8), lit(col, E), 0, 0.16, 0); root.rotation.x = Math.PI; root.scale.setScalar(0.5 + 0.5 * s);
-      mk(geo('sph', 0.2, 8, 6), lit(col, E), 0, 0.4 * (0.5 + 0.5 * s) - 0.04, 0).scale.set(0.5 + 0.5 * s, 0.5, 0.5 + 0.5 * s);
-      for (let i = 0; i < 2; i++) mk(geo('tor', 0.12 - i * 0.025, 0.012, 4, 10), mat(mixHex(col, 0x7A2E00, 0.3)), 0, 0.3 - i * 0.14, 0).rotation.x = Math.PI / 2;
-      break;
-    }
-    case 'corn': {
-      const h = 0.5 + 1.5 * g, lf = mat(green), lf2 = mat(mixHex(green, 0xBFFF9A, 0.3));
-      mk(geo('cyl', 0.07, 0.12, 1, 7), mat(sick ? 0x8A7A3A : 0x3FAF8A), 0, h / 2, 0).scale.y = h;
-      for (let i = 0; i < 6; i++) {
-        const a = i / 6 * Math.PI * 2 + 0.5, y = 0.25 + h * (0.25 + 0.12 * (i % 3));
-        const l = mk(geo('cone', 0.13, 1, 5), i % 2 ? lf : lf2, Math.cos(a) * 0.3, y, Math.sin(a) * 0.3);
-        l.rotation.z = Math.cos(a) * 1.0; l.rotation.x = Math.sin(a) * -1.0; l.scale.y = (0.55 + g * 0.55) * 0.9; l.scale.z = 0.35;
-      }
-      if (g > 0.5) for (let i = 0; i < 2; i++) {
-        const sx = i ? 0.15 : -0.15, sz = i ? 0.08 : -0.08, y = h * 0.66;
-        mk(geo('oct', 0.2, 0), lit(col, ready ? 0.9 : 0.35), sx, y, sz).scale.set(0.8, 1.9, 0.8);
-        for (let k = 0; k < 3; k++) { const hk = mk(geo('cone', 0.14, 0.6, 5), lf2, sx + Math.cos(k * 2.1 + i) * 0.1, y - 0.12, sz + Math.sin(k * 2.1 + i) * 0.1); hk.rotation.z = Math.cos(k * 2.1 + i) * 0.35; hk.rotation.x = -Math.sin(k * 2.1 + i) * 0.35; hk.scale.set(1, 0.95, 0.5); }
-      }
-      if (g > 0.4) for (let i = 0; i < 3; i++) { const t = mk(geo('cone', 0.03, 0.5, 4), mat(0xE8D890), 0, h + 0.12, 0); t.rotation.z = (i - 1) * 0.5; t.rotation.x = (i % 2) * 0.4; }
-      break;
-    }
-    case 'tomato': {
-      const stk = mat(0xC9A56B), lf = mat(green), lf2 = mat(mixHex(green, 0x1F6B30, 0.3));
-      mk(geo('cyl', 0.03, 0.03, 1.4, 5), stk, 0.4, 0.7, 0); mk(geo('cyl', 0.03, 0.03, 1.4, 5), stk, -0.4, 0.7, 0); mk(geo('cyl', 0.025, 0.025, 0.8, 5), stk, 0, 1.0, 0).rotation.z = Math.PI / 2;
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const l = mk(geo('ico', 0.26, 1), i % 2 ? lf : lf2, Math.cos(a) * 0.34 * s, 0.22 + 0.3 * s + (i % 3) * 0.12, Math.sin(a) * 0.34 * s); l.scale.set(1.1 * s, 0.5 * s, 0.8 * s); l.rotation.y = -a; }
-      mk(geo('ico', 0.34, 1), lf, 0, 0.1 + 0.4 * s, 0).scale.set(s, 0.9 * s, s);
-      const n = Math.floor(g * 6);
-      for (let i = 0; i < n; i++) {
-        const a = i * 2.2, x = Math.cos(a) * 0.45 * s, z = Math.sin(a) * 0.45 * s, y = 0.28 + (i % 3) * 0.2 * s;
-        const ripe = g > 0.75;
-        mk(geo('sph', 0.15, 10, 8), ripe ? lit(col, E) : mat(0x8FD36A), x, y, z).scale.set(1, 0.9, 1);
-        mk(geo('ico', 0.07, 0), mat(0x2E8F44), x, y + 0.14, z).scale.set(1.5, 0.4, 1.5);
-        if (ripe) mk(geo('sph', 0.04, 5, 4), glow(0xFFFFFF), x - 0.06, y + 0.07, z + 0.07);
-      }
-      break;
-    }
-    case 'mushroom': {
-      [[0, 0, 1], [0.55, 0.3, 0.65], [-0.45, -0.35, 0.75]].forEach(([x, z, k]) => {
-        const sc = s * k;
-        mk(geo('cyl', 0.1, 0.15, 0.6, 7), mat(0xE8E0F5), x, 0.3 * sc, z).scale.setScalar(sc);
-        const cap = mk(geo('sph', 0.46, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2), lit(col, ready ? 0.7 : 0.3), x, 0.58 * sc, z);
-        cap.scale.set(sc, sc * 0.85, sc);
-        if (g > 0.4) for (let k = 0; k < 4; k++) mk(geo('sph', 0.07, 6, 5), glow(0xFFFFFF), x + Math.cos(k * 1.6) * 0.22 * sc, 0.62 * sc + 0.2 * sc * (1 - (k % 2) * 0.35), z + Math.sin(k * 1.6) * 0.22 * sc).scale.set(1, 0.4, 1);
-        mk(geo('cyl', 0.5, 0.5, 0.04, 10), mat(0xC9B8E8), x, 0.55 * sc, z).scale.set(sc * 0.9, 1, sc * 0.9);
-      });
-      break;
-    }
-    case 'grape': {
-      for (const px of [-0.85, 0.85]) mk(geo('cyl', 0.05, 0.06, 1.5, 5), mat(0x8A5A34), px, 0.75, 0);
-      mk(geo('box', 1.9, 0.05, 0.05), mat(0x8A5A34), 0, 1.45, 0);
-      for (let i = 0; i < 6; i++) mk(geo('ico', 0.3, 1), mat(i % 2 ? green : mixHex(green, 0x1F6B30, 0.3)), (i - 2.5) * 0.36, 1.3 - 0.07 * (i % 2), (i % 2 ? 0.08 : -0.08)).scale.set(1.1, 0.5 * s, 0.7);
-      for (let i = 0; i < 3; i++) mk(geo('tor', 0.1, 0.02, 4, 8), mat(0x6BB04A), -0.5 + i * 0.5, 1.2, 0).rotation.y = i;
-      const n = Math.floor(g * 5);
-      for (let i = 0; i < n; i++) { const x = (i - (n - 1) / 2) * 0.4; for (let k = 0; k < 3; k++) mk(geo('sph', 0.11, 8, 6), lit(col, ready ? 0.5 : 0.15), x + (k - 1) * 0.07, 1.2 - k * 0.12, 0.04 * (k % 2)); }
-      break;
-    }
-    case 'flower': {
-      const h = 0.4 + 0.9 * g;
-      mk(geo('cyl', 0.04, 0.06, 1, 5), mat(green), 0, h / 2, 0).scale.y = h;
-      mk(geo('ico', 0.15, 1), lit(0xFFD166, 0.6), 0, h + 0.05, 0);
-      const pn = 4 + Math.floor(g * 4);
-      for (let i = 0; i < pn; i++) {
-        const a = i / pn * Math.PI * 2;
-        const pt = mk(geo('ico', 0.2, 1), lit(col, ready ? 0.55 : 0.2), Math.cos(a) * 0.34 * s, h + 0.05, Math.sin(a) * 0.34 * s);
-        pt.scale.set(1, 0.4, 1.4); pt.rotation.y = -a;
-      }
-      for (const lx of [-0.3, 0.3]) mk(geo('ico', 0.2, 1), mat(green), lx, h * 0.35, 0).scale.set(1.2, 0.35, 0.6);
-      for (let i = 0; i < pn; i++) { const a = (i + 0.5) / pn * Math.PI * 2; const p2 = mk(geo('ico', 0.16, 1), lit(mixHex(col, 0xFFFFFF, 0.35), ready ? 0.5 : 0.2), Math.cos(a) * 0.2 * s, h + 0.12, Math.sin(a) * 0.2 * s); p2.scale.set(1, 0.4, 1.3); p2.rotation.y = -a; }
-      if (ready) mk(geo('tor', 0.7, 0.03, 5, 18), glow(0xFFB0F0), 0, h + 0.1, 0).rotation.x = Math.PI / 2.5;
-      break;
-    }
-    case 'pumpkin': {
-      const body = mat(col), rib = lit(mixHex(col, 0xFFD080, 0.2), E * 0.8);
-      for (let i = 0; i < 5; i++) {
-        const b = mk(geo('sph', 0.5, 9, 7), i % 2 ? rib : lit(col, E * 0.8), 0, 0.2 + 0.28 * s, 0);
-        b.scale.set(1.0 * s, 0.78 * s, 0.5 * s); b.rotation.y = i * Math.PI / 5;
-      }
-      const stem = mk(geo('cyl', 0.06, 0.1, 0.28, 6), mat(0x5E8F2E), 0, 0.2 + 0.6 * s, 0); stem.rotation.z = 0.2;
-      mk(geo('tor', 0.1, 0.035, 5, 8), mat(0x5E8F2E), 0.1, 0.34 + 0.62 * s, 0).rotation.y = 1.2;
-      for (const sx of [-1, 1]) { mk(geo('ico', 0.35, 1), mat(green), sx * 0.8, 0.14, sx * 0.22).scale.set(1.3, 0.16, 1.1); mk(geo('ico', 0.22, 1), mat(mixHex(green, 0x1F6B30, 0.3)), sx * 0.55, 0.12, -sx * 0.3).scale.set(1.2, 0.15, 1); }
-      mk(geo('cyl', 0.02, 0.02, 0.9, 4), mat(0x6BB04A), 0, 0.1, 0).rotation.z = Math.PI / 2;
-      break;
-    }
-    case 'melon': {
-      mk(geo('ico', 0.6, 1), mat(green), 0, 0.15, 0).scale.set(1.4, 0.22, 1.4);
-      const dkc = mat(mixHex(col, 0x0E5A38, 0.55));
-      const body = mk(geo('sph', 0.55, 12, 9), lit(col, ready ? 0.45 : 0.12), 0, 0.2 + 0.5 * s, 0);
-      body.scale.setScalar(s * 0.95); body.scale.y *= 0.92;
-      if (g > 0.35) for (let i = 0; i < 4; i++) { const st = mk(geo('sph', 0.56, 3, 9, i * Math.PI / 2, 0.22, 0.25, 2.6), dkc, 0, 0.2 + 0.5 * s, 0); st.scale.setScalar(s * 0.97); st.scale.y *= 0.93; st.rotation.y = i * 0.5; }
-      mk(geo('cyl', 0.04, 0.06, 0.2, 5), mat(0x5E8F2E), 0, 0.2 + 1.02 * s, 0);
-      for (let i = 0; i < 3; i++) { const a = i * 2.1; mk(geo('ico', 0.18, 1), mat(0x2E8F66), Math.cos(a) * 0.7 * s, 0.14, Math.sin(a) * 0.7 * s).scale.set(1.3, 0.2, 1); }
-      if (ready) mk(geo('sph', 0.07, 6, 5), glow(0xFFFFFF), -0.2 * s, 0.55 + 0.5 * s, 0.35 * s);
-      break;
-    }
-    case 'pepper': {
-      const lf = mat(green), lf2 = mat(mixHex(green, 0x1F6B30, 0.3));
-      mk(geo('cyl', 0.04, 0.06, 0.6, 5), mat(0x7A5A34), 0, 0.3, 0);
-      mk(geo('ico', 0.4, 1), lf, 0, 0.1 + 0.38 * s, 0).scale.set(s, 1.1 * s, s);
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const l = mk(geo('ico', 0.2, 1), i % 2 ? lf : lf2, Math.cos(a) * 0.38 * s, 0.25 + 0.25 * s + (i % 3) * 0.1, Math.sin(a) * 0.38 * s); l.scale.set(1.1 * s, 0.4 * s, 0.7 * s); l.rotation.y = -a; }
-      const n = Math.floor(g * 7);
-      for (let i = 0; i < n; i++) {
-        const a = i * 2.4, r = 0.36 * s, x = Math.cos(a) * r, z = Math.sin(a) * r, y = 0.5 * s + 0.1 * (i % 3);
-        const p = mk(geo('cone', 0.09, 0.4, 6), lit(g > 0.75 ? col : 0xBFE08A, E + 0.1), x, y, z); p.rotation.x = Math.PI; p.rotation.z = Math.cos(a) * 0.3;
-        mk(geo('sph', 0.07, 6, 5), mat(0x2E8F44), x, y + 0.2, z).scale.set(1.2, 0.5, 1.2);
-        if (g > 0.75) mk(geo('sph', 0.03, 5, 4), glow(0xFFFFFF), x - 0.04, y + 0.08, z + 0.05);
-      }
-      break;
-    }
-    case 'lotus': {
-      const h = 0.3 + 0.8 * g;
-      for (let i = 0; i < 3; i++) { const a = i * 2.1; mk(geo('cyl', 0.5, 0.5, 0.05, 10), mat(green), Math.cos(a) * 0.55, 0.12 + i * 0.02, Math.sin(a) * 0.55); }
-      mk(geo('cyl', 0.04, 0.05, 1, 5), mat(green), 0, h / 2, 0).scale.y = h;
-      const pn = 5 + Math.floor(g * 4);
-      for (let i = 0; i < pn; i++) {
-        const a = i / pn * Math.PI * 2;
-        const pt = mk(geo('oct', 0.2, 0), lit(col, ready ? 0.8 : 0.35), Math.cos(a) * 0.28 * s, h + 0.12, Math.sin(a) * 0.28 * s);
-        pt.scale.set(0.8, 1.6, 0.8); pt.rotation.y = -a; pt.rotation.z = Math.cos(a) * 0.5; pt.rotation.x = Math.sin(a) * 0.5;
-      }
-      mk(geo('ico', 0.14, 1), glow(0xFFFFFF), 0, h + 0.1, 0);
-      if (ready) mk(geo('tor', 0.6, 0.03, 5, 18), glow(0xBFF3FF), 0, h + 0.1, 0).rotation.x = Math.PI / 2;
-      break;
-    }
-    default: break;
-  }
-  mk(geo('sph', 0.55, 8, 5), mat(0x6B4528), 0, 0.01, 0).scale.set(1, 0.22, 1);
-  if (sick) for (let i = 0; i < 3; i++) mk(geo('ico', 0.1, 1), mat(0x5A7A20), (i - 1) * 0.3, 1.1 + i * 0.12, (i % 2) * 0.2);
-  if (mut) mk(geo('tor', 0.75, 0.035, 5, 20), glow(mut.color), 0, 0.12, 0).rotation.x = Math.PI / 2;
-}
-
 // Malha de uma planta num estagio (usada tambem para mostrar plantas de outros jogadores)
-export function cropGeometry(key, g, mutKey) {
+export function cropGeometry(key, g, mutKey, sick = false) {
   const ready = g >= 1;
-  const sk = key + ':' + Math.min(5, Math.floor(g * 5)) + (ready ? 'r' : '') + (mutKey ? ':' + mutKey : '');
-  return cachedMerged('crop:' + sk, tmp => fillCrop(tmp, key, g, ready, false, mutKey ? CONFIG.mutations[mutKey] : null));
+  const sk = key + ':' + Math.min(5, Math.floor(g * 5)) + (ready ? 'r' : '') + (sick ? 's' : '') + (mutKey ? ':' + mutKey : '');
+  return cachedMerged('crop:' + sk, tmp => fillCrop(tmp, key, ready ? 1 : Math.floor(g*5)/5+0.06, ready, sick, mutKey ? CONFIG.mutations[mutKey] : null));
 }
 export function treeGeometry(type, g, fruits) {
   const d = CONFIG.trees[type];
@@ -318,11 +150,11 @@ function buildCrop(plot) {
   const c = CONFIG.crops[plot.crop];
   const g = Math.min(1, plot.progress / c.growTime), ready = g >= 1, sick = plot.sick;
   const mut = plot.mutation ? CONFIG.mutations[plot.mutation] : null;
-  const geom = cachedMerged('crop:' + plot.stageKey, tmp => fillCrop(tmp, plot.crop, g, ready, sick, mut));
+  const geom = cropGeometry(plot.crop,g,plot.mutation,sick);
   if (geom) {
     if (!geom.boundingBox) geom.computeBoundingBox();
     plot.top = geom.boundingBox.max.y;
-    const m = new THREE.Mesh(geom, vcMat); P.add(m); addOutline(m);
+    const m = new THREE.Mesh(geom, vcMat); varySpecimen(m,plot.x,plot.z); P.add(m); addOutline(m);
   }
   P.scale.setScalar(plot.mutation === 'giant' ? 1.3 : 1);
   if (mut) { // brilho orbitando a planta mutante
@@ -355,7 +187,10 @@ function waterPlot(plot, byDrone) {
   plot.progress = Math.min(crop.growTime, plot.progress + used * 2);
   const wasSick = plot.sick;
   plot.sick = false; plot.dirty = true;
-  burst(plot.x, 1.4, plot.z, 0x4FC3F7, byDrone ? 6 : 14, 1.2, 1.5);
+  if (!byDrone) {
+    const tip = wateringCan.pour();
+    waterJet(tip.x,tip.y,tip.z,plot.x,0.55,plot.z);
+  } else burst(plot.x,1.3,plot.z,0x4FC3F7,6,1.2,1.5);
   if (!byDrone) { play('water'); showToast(wasSick ? 'Planta curada e regada' : 'Regou a plantacao', wasSick ? 'good' : 'info'); }
   else if (wasSick) showToast('Um drone curou uma planta doente', 'good');
   return true;
@@ -419,6 +254,7 @@ function updatePlots(dt, t) {
       const gg = p.progress / crop.growTime;
       const key = p.crop + ':' + Math.min(5, Math.floor(gg * 5)) + (gg >= 1 ? 'r' : '') + (p.sick ? 's' : '') + (p.mutation ? ':' + p.mutation : '');
       if (p.dirty || key !== p.stageKey) { p.stageKey = key; p.dirty = false; buildCrop(p); }
+      p.plant.rotation.z = Math.sin(t*1.45+i*2.4)*0.024;
       if (p.glowMesh) { p.glowMesh.position.y = p.top + 0.35 + Math.sin(t * 3 + i) * 0.08; p.glowMesh.rotation.y += dt * 2; }
       if (p.aura) { const a = t * 1.6 + i; p.aura.position.set(Math.cos(a) * 0.8, p.top * 0.6 + Math.sin(t * 2 + i) * 0.2, Math.sin(a) * 0.8); p.aura.rotation.y += dt * 3; }
     } else if (p.dirty) { p.dirty = false; p.stageKey = ''; buildCrop(p); }
@@ -430,53 +266,13 @@ function updatePlots(dt, t) {
 // ======================================================================
 //  ARVORES FRUTIFERAS
 // ======================================================================
-function fillTree(P, type, g, fruits) {
-  const d = CONFIG.trees[type];
-  const s = 0.3 + 0.7 * g, mature = g >= 1;
-  const mk = (gm, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(gm, m); o.position.set(x, y, z); o.castShadow = true; P.add(o); return o; };
-  const fruitMat = mat(d.fruitColor, { emissive: d.fruitColor, emissiveIntensity: 0.3 });
-  if (type === 'coconut') {
-    const th = 2.6 * s;
-    for (let i = 0; i < 3; i++) mk(geo('cyl', 0.14, 0.2, th / 3 + 0.05, 6), mat(0x9A6B3C), 0.18 * (i + 0.5) * s, th / 3 * (i + 0.5), 0).rotation.z = -0.12;
-    const tx = 0.54 * s;
-    for (let i = 0; i < 7; i++) {
-      const a = i / 7 * Math.PI * 2;
-      const f = mk(geo('cone', 0.22, 1.7, 4), mat(i % 2 ? d.crown : mixHex(d.crown, 0xffffff, 0.2)), tx + Math.cos(a) * 0.7 * s, th + 0.1, Math.sin(a) * 0.7 * s);
-      f.rotation.z = -Math.cos(a) * 1.25; f.rotation.x = Math.sin(a) * 1.25; f.scale.set(1, 0.5 + 0.5 * s, 0.35);
-    }
-    if (mature) for (let i = 0; i < Math.min(fruits, 5); i++) { const a = i * 1.26; mk(geo('sph', 0.17, 8, 6), fruitMat, tx + Math.cos(a) * 0.26, th - 0.16, Math.sin(a) * 0.26); }
-    return;
-  }
-  const th = 1.7 * s;
-  if (type === 'crystaltree') {
-    mk(geo('cyl', 0.12, 0.2, th, 6), mat(0xE8F0F7, { emissive: d.crown, emissiveIntensity: 0.25 }), 0, th / 2, 0);
-    const cm = mat(d.crown, { emissive: d.crown, emissiveIntensity: 0.7 });
-    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; mk(geo('oct', 0.45, 0), cm, Math.cos(a) * 0.55 * s, th + 0.35 + (i % 2) * 0.35, Math.sin(a) * 0.55 * s).scale.set(0.8, 2.0, 0.8); }
-    mk(geo('oct', 0.55, 0), cm, 0, th + 0.7, 0).scale.set(0.9, 2.2, 0.9);
-    if (mature) for (let i = 0; i < fruits; i++) { const a = i * 2.399; mk(geo('sph', 0.14, 8, 6), fruitMat, Math.cos(a) * 0.75, th + 0.1 + (i % 3) * 0.3, Math.sin(a) * 0.75); }
-    return;
-  }
-  const bark = mat(0x7A4E2D), bark2 = mat(0x5E3A20);
-  mk(geo('cyl', 0.16, 0.28, th, 8), bark, 0, th / 2, 0);
-  mk(geo('cyl', 0.28, 0.46, 0.28 * s + 0.1, 8), bark2, 0, 0.1, 0);
-  if (g > 0.5) for (let i = 0; i < 2; i++) { const br = mk(geo('cyl', 0.05, 0.1, 0.8 * s, 5), bark, (i ? -1 : 1) * 0.28 * s, th * 0.82, 0); br.rotation.z = (i ? 1 : -1) * 0.8; }
-  const c1 = mat(d.crown), c2 = mat(mixHex(d.crown, 0xffffff, 0.15)), c3 = mat(mixHex(d.crown, 0xFFF3A0, 0.28)), c0 = mat(mixHex(d.crown, 0x16301F, 0.22));
-  const blob = (r, c, x, y, z) => mk(geo('ico', r, 1), c, x * s, th + y * s, z * s).scale.setScalar(s);
-  blob(0.95, c0, 0, 0.55, 0);
-  for (let i = 0; i < 5; i++) { const a2 = i / 5 * Math.PI * 2 + 0.3; blob(0.72, i % 2 ? c1 : c2, Math.cos(a2) * 0.78, 0.3 + (i % 2) * 0.12, Math.sin(a2) * 0.78); }
-  blob(0.85, c1, 0, 1.1, 0);
-  blob(0.55, c3, 0.25, 1.55, 0.15);
-  blob(0.4, c3, -0.5, 1.15, 0.45);
-  if (mature) for (let i = 0; i < fruits; i++) { const a = i * 2.399, r = (0.55 + 0.2 * (i % 3)) * s; mk(geo('sph', 0.13, 8, 6), fruitMat, Math.cos(a) * r, th + 0.25 * s + (i % 3) * 0.3 * s, Math.sin(a) * r); }
-}
-
 const treeStage = (d, data) => Math.min(5, Math.floor(data.progress / d.growTime * 5));
 function buildTree(inst) {
   const d = CONFIG.trees[inst.data.type], data = inst.data;
   const g = Math.min(1, data.progress / d.growTime);
   inst.group.clear();
   const geom = cachedMerged('tree:' + inst.stageKey, tmp => fillTree(tmp, data.type, g >= 1 ? 1 : Math.floor(g * 5) / 5 + 0.1, data.fruits));
-  if (geom) { const m = new THREE.Mesh(geom, vcMat); m.castShadow = true; m.receiveShadow = true; inst.group.add(m); addOutline(m); }
+  if (geom) { const m = new THREE.Mesh(geom, vcMat); m.castShadow = true; m.receiveShadow = true; varySpecimen(m,data.x,data.z); inst.group.add(m); addOutline(m); }
 }
 
 function createTreeInstance(data, animate) {
@@ -514,7 +310,10 @@ function waterTree(tree, byDrone) {
   if (state.water < 0.5 || tree.water >= 6) return false;
   const used = Math.min(state.water, 2);
   state.water -= used; tree.water = Math.min(8, tree.water + used * 2.5);
-  burst(tree.x, 2.2, tree.z, 0x4FC3F7, byDrone ? 6 : 14, 1.2, 1.5);
+  if (!byDrone) {
+    const tip = wateringCan.pour();
+    waterJet(tip.x,tip.y,tip.z,tree.x,0.55,tree.z);
+  } else burst(tree.x,1.3,tree.z,0x4FC3F7,6,1.2,1.5);
   if (!byDrone) { play('water'); showToast('Regou ' + CONFIG.trees[tree.type].name, 'info'); }
   return true;
 }
@@ -657,6 +456,11 @@ function irrigatorPulse(inst) {
   const range = cfg.range * (1 + 0.2 * (lvl - 1));
   if (cfg.energy > 0 && state.energy < cfg.energy) return;
   const x = inst.data.x, z = inst.data.z, r2 = range * range;
+  const nozzle = { sprinkler: 1.45, rotary: 2.7, cloud: 4.1, drip: 0.8 }[inst.data.type] * inst.group.scale.y;
+  function spray(tx, ty, tz) {
+    waterJet(x,nozzle,z,tx,ty,tz,inst.data.type);
+    bus.emit('irrigate', {x,y:nozzle,z,tx,ty,tz,type:inst.data.type});
+  }
   let watered = 0;
   for (let i = 0; i < state.plots.length; i++) {
     const p = state.plots[i];
@@ -670,7 +474,7 @@ function irrigatorPulse(inst) {
     p.water = Math.min(12, p.water + crop.waterUse * 0.9);
     p.progress = Math.min(crop.growTime, p.progress + crop.waterUse * 0.5);
     p.sick = false; p.dirty = true;
-    burst(p.x, 1.3, p.z, 0x4FC3F7, 4, 1, 1.5);
+    spray(p.x, 0.65, p.z);
     watered++;
   }
   for (let i = 0; i < state.trees.length; i++) {
@@ -679,7 +483,7 @@ function irrigatorPulse(inst) {
     if (dx * dx + dz * dz > r2 || t.water >= 3) continue;
     if (cfg.water > 0 && state.water < cfg.water) break;
     state.water -= cfg.water; t.water = Math.min(8, t.water + 3);
-    burst(t.x, 2, t.z, 0x4FC3F7, 4, 1, 1.5);
+    spray(t.x, 0.35, t.z);
     watered++;
   }
   if (watered > 0) {
@@ -1113,7 +917,9 @@ function addPickupMesh(p) {
   const g = new THREE.Group();
   const rock = new THREE.Mesh(geo('ico', 0.55, 1), mat(0xFF9A3C, { emissive: 0xFF6A1A, emissiveIntensity: 1.2 }));
   const halo = new THREE.Mesh(geo('sph', 0.95, 10, 8), glow(0xFFD166, 0.25));
-  rock.castShadow = true; g.add(rock, halo);
+  rock.castShadow = true;rock.scale.set(0.75,1.25,0.75);
+  const seam=new THREE.Mesh(geo('tor',0.43,0.045,5,12),mat(0xFFE5A0));seam.rotation.x=1.1;
+  g.add(rock,halo,seam);
   g.position.set(p.x, 0.9, p.z); scene.add(g);
   pickupMeshes.set(p.id, g);
 }
@@ -1299,7 +1105,10 @@ function createVisitors() {
     const body = new THREE.Mesh(geo('cyl', 0.22, 0.28, 0.95, 7), mat(cols[i])); body.position.y = 0.55;
     const head = new THREE.Mesh(geo('sph', 0.21, 8, 6), mat(0xF2C9A0)); head.position.y = 1.25;
     const pack = new THREE.Mesh(geo('box', 0.3, 0.4, 0.14), mat(0x3D4A5C)); pack.position.set(0, 0.65, -0.26);
-    g.add(body, head, pack); g.visible = false; scene.add(g);
+    const hat=new THREE.Mesh(geo('cyl',0.29,0.33,0.10,12),mat(0xDCA762));hat.position.y=1.42;
+    const crown=new THREE.Mesh(geo('sph',0.21,10,7),mat(0xF5C981));crown.position.y=1.45;crown.scale.y=0.66;
+    for(const side of [-1,1]){const shoe=new THREE.Mesh(geo('sph',0.12,7,5),mat(0x453A3E));shoe.scale.set(0.8,0.72,1.4);shoe.position.set(side*0.12,0.09,0.06);g.add(shoe);}
+    g.add(body, head, pack,hat,crown); g.visible = false; scene.add(g);
     visitors.push({ group: g, target: new THREE.Vector3(), wait: 0, active: false, atStruct: false, phase: Math.random() * 6 });
   }
 }
@@ -1406,7 +1215,7 @@ function cullFar() {
 export function initGame(sceneRef, cameraRef, worldRef) {
   scene = sceneRef; camera = cameraRef; world = worldRef;
   plotGroup = new THREE.Group(); scene.add(plotGroup);
-  initEffects(scene, camera);
+  initEffects(scene, camera); initWater(scene); wateringCan=createWateringCan(camera);
 
   ringOk = new THREE.MeshBasicMaterial({ color: 0x4FE3C1, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
   ringBad = new THREE.MeshBasicMaterial({ color: 0xFF5470, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
@@ -1459,7 +1268,8 @@ export function initGame(sceneRef, cameraRef, worldRef) {
 }
 
 export function updateGame(dt) {
-  clock += dt;
+  clock += dt; updateWater(dt);
+  wateringCan.update(dt,state.mode==='play' && !state.paused && HOTBAR[state.selectedSlot]?.type==='can',clock);
   if (state.mode !== 'play') { world.update(dt); updateEffects(dt); return; }
   if (state.paused || isResumeVisible()) { setPrompt(''); updateEffects(dt); world.update(dt); return; }
 

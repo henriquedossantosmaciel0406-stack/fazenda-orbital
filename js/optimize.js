@@ -58,6 +58,7 @@ export function mergeGroupStatic(group, skip) {
   let cast = false;
   for (const m of meshes) { cast = cast || m.castShadow; m.parent.remove(m); }
   const mesh = new THREE.Mesh(geom, vcMat);
+  mesh.userData.ownedGeometry = true;
   mesh.castShadow = cast; mesh.receiveShadow = true;
   group.add(mesh);
   addOutline(mesh);

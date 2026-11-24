@@ -229,8 +229,10 @@ export function row(o) {
     o.buttons.forEach(b => {
       const bt = el('button', b.cls || '', b.label);
       bt.type = 'button'; bt.disabled = !!b.disabled;
-      bt.addEventListener('click', () => {
-        const res = b.onClick && b.onClick();
+      bt.addEventListener('click', async () => {
+        bt.disabled = true;
+        let res;
+        try { res = await b.onClick?.(); } finally { bt.disabled = !!b.disabled; }
         if (res === 'close') closeModal();
         else if (res !== 'keep') refreshModal();
         updateHUD();

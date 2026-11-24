@@ -1,10 +1,11 @@
+import { finishStructure, shopfront, entryPorch } from './workshop.js';
 // Mundo 3D: terreno, estrada, fazenda, cidade, ilha, ponte, modelos de construcoes e decoracoes.
 // Geometrias e materiais sao compartilhados (cache) para manter 60 FPS.
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { mergeGroupStatic } from './optimize.js';
 import { toonGradient, cartoonColor } from './toon.js';
-import { applyWind } from './scenery.js';
+import { woodland } from './woodland.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // ---------- Caches compartilhados ----------
@@ -66,13 +67,16 @@ export function makeLabel(text, color = '#4FE3C1', w = 6, h = 1.2) {
   g.fillStyle = color; g.font = '800 ' + Math.round(c.height * 0.52) + 'px "Baloo 2", system-ui, sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, c.width / 2, c.height / 2 + 3);
   const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
-  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, toneMapped: false }));
+  sign.scale.set(w, h, 1);
+  return sign;
 }
 
 // Pulsos de brilho compartilhados (um por material, nao por instancia)
 const PULSES = [];
 const PULSE_MATS = new Set();
-function pulsing(m, base, amp, speed) { PULSES.push({ m, base, amp, speed }); PULSE_MATS.add(m); return m; }
+function pulsing(m, base, amp, speed) { if (!PULSE_MATS.has(m)) PULSES.push({ m, base, amp, speed }); PULSE_MATS.add(m); return m; }
 
 // ---------- Modelos de estruturas ----------
 export const STRUCT_COLORS = { building: 0x4FE3C1, decor: 0xFF9AE0 };
@@ -363,6 +367,7 @@ export function createStructureModel(type) {
   const g = new THREE.Group();
   g.userData = { spin: [], height: 3, accents: [], type };
   builders[type](g, g.userData);
+  finishStructure(g,type);
   const def = CONFIG.structures[type];
   if (def.kind === 'building') {
     // Aneis de melhoria: aparecem conforme o nivel
@@ -477,17 +482,20 @@ export function createWorld(scene) {
   function houseDome(x, z) {
     const g = new THREE.Group();
     add(g, M(geo('cyl', 4.5, 4.7, 0.5, 18), mat(0x9AA6B8)), 0, 0.25, 0);
-    add(g, M(geo('cyl', 4.0, 4.3, 4.6, 18), mat(0xFFE6C8)), 0, 2.8, 0);
-    flatRing(g, 4.15, 2.0, 0.16, 0xFFB86B); flatRing(g, 4.0, 5.0, 0.2, 0xFFD166);
+    add(g, M(geo('cyl', 4.0, 4.3, 4.6, 18), mat(0xFFE6C8, { side: THREE.DoubleSide })), 0, 2.8, 0);
+    flatRing(g, 4.32, 0.72, 0.11, 0xDDA273);
+    add(g,M(geo('cyl',4.60,4.53,0.23,20),mat(0x3E9188)),0,4.96,0);
+    flatRing(g,4.55,4.91,0.075,0xFFD166);
     const dome = add(g, M(geo('sph', 4.6, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x3FC9B0)), 0, 5.0, 0); dome.scale.y = 0.95;
     add(g, M(geo('cyl', 0.12, 0.12, 1.4, 6), mat(0x6B5A7A)), 0, 9.7, 0);
     add(g, M(geo('sph', 0.42, 10, 8), mat(0xFFD166, { emissive: 0xFFD166, emissiveIntensity: 0.6 })), 0, 10.5, 0);
-    const door = add(g, M(geo('cyl', 1.0, 1.0, 0.2, 16), mat(0x8A4F2D)), 0, 1.9, 4.05); door.rotation.x = Math.PI / 2; door.scale.set(1, 1, 1.35);
     add(g, M(geo('cyl', 1.5, 1.6, 0.25, 14, 1, false, 0, Math.PI), mat(0xD9CBB5)), 0, 0.5, 4.3).rotation.y = Math.PI / 2;
     const tw = add(g, M(geo('cyl', 1.2, 1.4, 6.4, 12), mat(0xFFB3C7)), 6.8, 3.2, -3.6);
     add(g, M(geo('cone', 1.9, 2.8, 12), mat(0xFF6FA5)), 6.8, 7.8, -3.6);
     add(g, M(geo('sph', 0.28, 8, 6), mat(0xFFFFFF)), 6.8, 9.4, -3.6);
     add(g, M(geo('box', 3.6, 0.2, 1.1), mat(0xD9CBB5)), 4.7, 0.5, -1.9).rotation.y = -0.5;
+    entryPorch(g,4.27,0x40AFA1);
+    world.colliders.push({x,z:z+4.27+0.35,radius:1.28});
     g.position.set(x, 0, z); scene.add(g);
     [0.2, 0.75, 1.3, 1.85].forEach(k => porthole(x, z, 3.4, Math.PI * k + 0.4, 4.05));
     porthole(x + 6.8, z - 3.6, 5.2, 0.5, 1.28);
@@ -501,12 +509,14 @@ export function createWorld(scene) {
     tiers.forEach(([rb, rt, h, c], i) => {
       add(g, M(geo('cyl', rt, rb, h, 14), mat(c)), 0, y + h / 2, 0);
       y += h;
+      add(g,M(geo('cyl',rt+0.27,rt+0.24,0.19,14),mat(0xDE9870)),0,y,0);
       flatRing(g, rt + 0.25, y, 0.2, i % 2 ? 0x59E6FF : 0xFF6FA5);
     });
     add(g, M(geo('cone', 3.3, 4.4, 14), mat(0xFF7A59)), 0, y + 2.2, 0);
     add(g, M(geo('sph', 0.9, 12, 8), mat(0xFFE08A, { emissive: 0xFFD166, emissiveIntensity: 0.7 })), 0, y + 4.7, 0);
     [0, 1, 2].forEach(i => { const a = i * 2.1; add(g, M(geo('sph', 0.55, 8, 6), mat(i % 2 ? 0x59E6FF : 0xFF6FA5)), Math.cos(a) * 2.9, 1.5, Math.sin(a) * 2.9); });
-    const door = add(g, M(geo('cyl', 0.9, 0.9, 0.2, 16), mat(0x7A3F6B)), 0, 1.8, 3.85); door.rotation.x = Math.PI / 2; door.scale.set(1, 1, 1.4);
+    entryPorch(g,3.95,0xBC7358);
+    world.colliders.push({x,z:z+3.95+0.35,radius:1.28});
     g.position.set(x, 0, z); scene.add(g);
     for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) porthole(x, z, 2.4 + t * 3.0, Math.PI * (0.3 + k * 0.75) + t * 0.5, tiers[t][1] + 0.1);
   }
@@ -516,13 +526,15 @@ export function createWorld(scene) {
     add(g, M(geo('cyl', 4.2, 4.4, 0.4, 16), mat(0x8FA0B8)), 0, 0.2, 0);
     const egg = add(g, M(geo('sph', 4.3, 20, 16), mat(0xBFE3FF)), 0, 4.4, 0); egg.scale.set(1, 1.05, 1);
     const cap = add(g, M(geo('sph', 4.45, 20, 8, 0, Math.PI * 2, 0, 0.95), mat(0x7A6BFF)), 0, 4.4, 0); cap.scale.set(1, 1.05, 1);
+    add(g,M(geo('cyl',3.60,3.48,0.19,20),mat(0x7368B5)),0,7.12,0);
     flatRing(g, 3.2, 7.9, 0.22, 0xFFD166, 24);
     add(g, M(geo('cyl', 0.1, 0.12, 2.4, 6), mat(0xC9D8E4)), 0, 10.3, 0);
     flatRing(g, 0.7, 10.6, 0.08, 0x59E6FF, 16);
     add(g, M(geo('sph', 0.3, 8, 6), mat(0xFF6FA5, { emissive: 0xFF6FA5, emissiveIntensity: 0.7 })), 0, 11.6, 0);
-    const door = add(g, M(geo('cyl', 0.95, 0.95, 0.2, 16), mat(0x5A4A8A)), 0, 1.9, 4.0); door.rotation.x = Math.PI / 2; door.scale.set(1, 1, 1.35);
     add(g, M(geo('cyl', 1.9, 2.0, 1.6, 14), mat(0xFFE6C8)), -7.2, 0.8, 2.6);
     add(g, M(geo('sph', 1.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xFFB3C7)), -7.2, 1.6, 2.6);
+    entryPorch(g,3.68,0x8C84CA);
+    world.colliders.push({x,z:z+3.68+0.35,radius:1.28});
     g.position.set(x, 0, z); scene.add(g);
     [0.3, 0.9, 1.5].forEach(k => porthole(x, z, 4.4 + k * 0.5, Math.PI * (0.25 + k * 0.6), 4.2));
   }
@@ -538,12 +550,13 @@ export function createWorld(scene) {
     const bulb = add(g, M(geo('sph', 1.2, 12, 10), mat(0xFFB3C7)), 8.0, 6.6, -4.6); bulb.scale.y = 1.4;
     add(g, M(geo('cyl', 1.0, 1.1, 5.2, 10), mat(0xFFE6C8)), 8.0, 2.8, -4.6);
     add(g, M(geo('cone', 0.4, 1.4, 8), mat(0xFF6FA5)), 8.0, 8.9, -4.6);
-    const door = add(g, M(geo('cyl', 0.9, 0.9, 0.2, 16), mat(0x7A4A2A)), 0, 1.9, 4.05); door.rotation.x = Math.PI / 2; door.scale.set(1, 1, 1.35);
+    entryPorch(g,4.47,0x54AA75);
+    world.colliders.push({x,z:z+4.47+0.35,radius:1.28});
     g.position.set(x, 0, z); scene.add(g);
     [0.3, 0.9, 1.5, 2.1].forEach(k => porthole(x, z, 3.5, Math.PI * k + 0.3, 3.9));
   }
   houseDome(16, 12); houseTower(42, 12); houseEgg(16, 40); houseHex(42, 40);
-  [[16, 12, 4.3], [22.8, 8.4, 1.3], [42, 12, 4.2], [16, 40, 4.0], [8.8, 42.6, 1.8], [42, 40, 4.2], [50, 35.4, 1.1]].forEach(([x, z, r]) => world.colliders.push({ x, z, radius: r }));
+  [[16, 12, 4.85], [22.8, 8.4, 1.55], [42, 12, 4.6], [16, 40, 4.55], [8.8, 42.6, 2.1], [42, 40, 5.1], [50, 35.4, 1.25]].forEach(([x, z, r]) => world.colliders.push({ x, z, radius: r }));
   const wins = new THREE.InstancedMesh(geo('cyl', 0.5, 0.5, 0.14, 14), winMat, winSpots.length), wm = new THREE.Matrix4();
   const wq = new THREE.Quaternion(), wq2 = new THREE.Quaternion(), wsc = new THREE.Vector3(1, 1, 1), wp = new THREE.Vector3(), AX = new THREE.Vector3(1, 0, 0), AY = new THREE.Vector3(0, 1, 0);
   winSpots.forEach((p, i) => {
@@ -564,8 +577,9 @@ export function createWorld(scene) {
     add(g, M(geo('cone', 4.0, 1.4, 16), mat(c2)), 0, 4.55, 0);
     scallops(g, 16, 4.4, 3.25, 0.5, color, c2);
     add(g, M(geo('sph', 0.55, 10, 8), mat(0xFFD166, { emissive: 0xFFD166, emissiveIntensity: 0.5 })), 0, 5.5, 0);
-    [[-1.3, 1.9], [0.2, 2.1], [1.4, 1.7]].forEach(([px, pz], i) => add(g, M(geo('sph', 0.5, 10, 8), mat([0xFF6F6F, 0xFFB347, 0x7ED957][i])), px, 1.75, pz * (signZ > 0 ? 1 : -1) * 0.7));
+
     [[-2.9, 0.4], [2.9, -0.4]].forEach(([px, pz]) => add(g, M(geo('cyl', 0.55, 0.6, 1.0, 10), mat(0xB07A44)), px, 0.85, pz + 1.6 * (signZ > 0 ? 1 : -1)));
+    shopfront(g,false);
     const lbl = makeLabel(label, '#' + color.toString(16).padStart(6, '0'), 5, 1);
     lbl.position.set(0, 6.4, 0); g.add(lbl);
     g.position.set(x, 0, z); scene.add(g);
@@ -578,6 +592,7 @@ export function createWorld(scene) {
     add(g, M(geo('cyl', 3.6, 3.8, 0.35, 8), mat(0xD9CBB5)), 0, 0.17, 0);
     add(g, M(geo('cyl', 2.4, 2.5, 1.2, 8), mat(0xB07A44)), 0, 0.95, 0);
     flatRing(g, 2.45, 1.58, 0.16, 0xFFD166, 8);
+    add(g,M(geo('cyl',4.78,4.72,0.12,8),mat(0xC6A577)),0,3.11,0);
     for (let i = 0; i < 8; i++) {
       const wedge = M(geo('cyl', 0.05, 4.8, 2.2, 1, 1, true, i * Math.PI / 4, Math.PI / 4), mat(i % 2 ? 0xFFFFFF : color, { side: THREE.DoubleSide }));
       add(g, wedge, 0, 4.2, 0);
@@ -585,8 +600,9 @@ export function createWorld(scene) {
     for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; add(g, M(geo('sph', 0.34, 8, 6), mat(i % 2 ? 0xFFFFFF : color)), Math.sin(a) * 4.7, 3.15, Math.cos(a) * 4.7); }
     for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; add(g, M(geo('cyl', 0.11, 0.13, 3.0, 8), mat(0x6B5A7A)), Math.cos(a) * 3.1, 1.8, Math.sin(a) * 3.1); }
     add(g, M(geo('sph', 0.5, 10, 8), mat(0xFF6FA5)), 0, 5.55, 0);
-    [0xFF6F6F, 0xFFB347, 0x7ED957, 0xB26BFF, 0xFFD166].forEach((c, i) => { const a = i / 5 * Math.PI * 2; add(g, M(geo('sph', 0.36, 8, 6), mat(c)), Math.cos(a) * 1.5, 1.8, Math.sin(a) * 1.5); });
+
     for (let i = 0; i < 3; i++) add(g, M(geo('cyl', 0.5, 0.5, 0.5, 12), mat(0xFFFFFF)), 3.1 * Math.cos(i * 2 + 1), 0.6, 3.1 * Math.sin(i * 2 + 1));
+    shopfront(g,true);
     const lbl = makeLabel(label, '#' + color.toString(16).padStart(6, '0'), 5, 1);
     lbl.position.set(0, 6.5, 0); g.add(lbl);
     g.position.set(x, 0, z); scene.add(g);
@@ -602,6 +618,8 @@ export function createWorld(scene) {
   const pl = makeLabel('AGUA', '#4FC3F7', 2.2, 0.7); pl.position.set(0, 3.0, 0); pump.add(pl);
   pump.position.set(-36, 0, 5); scene.add(pump);
   world.pumpLabel = pl;
+  const wheel=add(pump,M(geo('tor',0.34,0.065,6,14),mat(0xC17851)),0,1.25,0.64);
+  for(let i=0;i<3;i++) add(wheel,M(geo('box',0.6,0.045,0.05),mat(0xFFE3A8))).rotation.z=i*Math.PI/3;
 
   // --- Estacao de drones (4 plataformas de pouso) ---
   const station = new THREE.Group();
@@ -616,6 +634,10 @@ export function createWorld(scene) {
   const sl = makeLabel('ESTACAO DE DRONES', '#4FE3C1', 5.6, 0.9); sl.position.set(0, 3.0, -1.6); station.add(sl);
   add(station, M(geo('cyl', 0.1, 0.1, 2.6, 6), mat(0x3D4A5C)), -3.2, 1.4, -1.6);
   add(station, M(geo('cyl', 0.1, 0.1, 2.6, 6), mat(0x3D4A5C)), 3.2, 1.4, -1.6);
+  for(const side of [-1,1]) {
+    add(station,M(geo('box',6.6,0.085,0.1),mat(0xEBC483)),0,0.31,side*1.8);
+    add(station,M(geo('box',0.6,1.05,0.72),mat(0x527885)),side*3.0,0.66,-1.35);
+  }
   station.position.set(-22, 0, 6); scene.add(station);
 
   // --- Arvores instanciadas (cone + tronco) ---
@@ -632,48 +654,7 @@ export function createWorld(scene) {
     if (!keepOut(x, z)) treeSpots.push([x, z]);
   }
   world.keepOut = keepOut;
-  const N = treeSpots.length;
-  const trunks = new THREE.InstancedMesh(geo('cyl', 0.2, 0.34, 1.7, 8), mat(0x7A4E2D, { roughness: 1 }), N);
-  const leafMat = () => applyWind(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient }), 0.07, 1.5);
-  const lm = leafMat();
-  // pinheiros: 3 cones empilhados; copas redondas: 3 bolhas
-  const pine = [0, 1, 2].map(k => new THREE.InstancedMesh(geo('cone', 1.9 - k * 0.5, 2.1, 8), lm, N));
-  const blob = [0, 1, 2].map(k => new THREE.InstancedMesh(geo('ico', 1.55 - k * 0.3, 1), lm, N));
-  const all = [trunks, ...pine, ...blob];
-  all.forEach(o => { o.castShadow = true; });
-  const tm = new THREE.Matrix4(), tq = new THREE.Quaternion(), ts = new THREE.Vector3(), tp = new THREE.Vector3(), tc = new THREE.Color(), hid = new THREE.Matrix4().makeScale(0, 0, 0);
-  const greens = [0x4FBF68, 0x3FAF78, 0x6ACB5A, 0x38A88A, 0x58C46A];
-  const pineGreens = [0x2F9E68, 0x2A8F72, 0x3BAA66];
-  treeSpots.forEach(([x, z], i) => {
-    const sc = 0.85 + rnd() * 0.55, isPine = i % 3 === 0;
-    tm.compose(tp.set(x, 0.85 * sc, z), tq, ts.set(sc, sc * (isPine ? 1.15 : 1), sc)); trunks.setMatrixAt(i, tm);
-    for (let k = 0; k < 3; k++) {
-      if (isPine) {
-        tm.compose(tp.set(x, (2.3 + k * 1.35) * sc, z), tq, ts.set(sc, sc, sc)); pine[k].setMatrixAt(i, tm);
-        pine[k].setColorAt(i, tc.setHex(pineGreens[(i + k) % 3]).offsetHSL(0, 0, k * 0.035));
-        blob[k].setMatrixAt(i, hid); blob[k].setColorAt(i, tc.setHex(0xffffff));
-      } else {
-        const off = [[0, 0], [0.9, 0.3], [-0.6, -0.5]][k];
-        tm.compose(tp.set(x + off[0] * sc, (2.9 + k * 0.55) * sc, z + off[1] * sc), tq, ts.set(sc, sc * 0.92, sc)); blob[k].setMatrixAt(i, tm);
-        blob[k].setColorAt(i, tc.setHex(greens[(i + k) % greens.length]).offsetHSL(0, 0, k * 0.03));
-        pine[k].setMatrixAt(i, hid); pine[k].setColorAt(i, tc.setHex(0xffffff));
-      }
-    }
-    world.colliders.push({ x, z, radius: 0.55 * sc });
-  });
-  scene.add(...all);
-
-  // --- Flores e tufos de grama (instanciados) ---
-  const bloom = new THREE.InstancedMesh(geo('ico', 0.22, 0), mat(0xffffff, { roughness: 0.6 }), 260);
-  const bcols = [0xFF6FA5, 0xFFD166, 0xFFFFFF, 0xB26BFF, 0x59E6FF];
-  let bi = 0; guard = 0;
-  while (bi < 260 && guard++ < 2000) {
-    const x = (rnd() - 0.5) * 230, z = (rnd() - 0.5) * 230;
-    if (keepOut(x, z) && !(x < farm.x0 - 4 && x > -118)) continue;
-    if (Math.abs(x) < 8) continue;
-    tm.compose(tp.set(x, 0.2, z), tq, ts.set(1, 1 + rnd() * 0.5, 1)); bloom.setMatrixAt(bi, tm); bloom.setColorAt(bi, tc.setHex(bcols[bi % bcols.length])); bi++;
-  }
-  bloom.count = bi; bloom.visible = false;
+  woodland(scene,world,treeSpots,rnd);
 
   // --- Postes de luz ao longo da estrada (como no original) ---
   const lampMat = mat(0x3D4A5C, { roughness: 0.6, metalness: 0.3 });
@@ -809,7 +790,7 @@ function buildIsland(scene, world, rnd) {
   }
   group.add(crystals);
   const pTrunk = new THREE.InstancedMesh(geo('cyl', 0.2, 0.28, 1.6, 6), mat(0x7A4E8A), 22);
-  const pCrown = new THREE.InstancedMesh(geo('ico', 1.5, 0), mat(0xffffff, { roughness: 0.7 }), 22);
+  const pCrown = new THREE.InstancedMesh(geo('oct', 1.55, 1), mat(0xffffff, { roughness: 0.7 }), 22);
   const pcols = [0xFF8FD0, 0xFFA6E6, 0xC8A0FF];
   for (let i = 0; i < 22; i++) {
     const a = rnd() * Math.PI * 2, r = 16 + rnd() * (isl.radius - 20);
@@ -817,7 +798,7 @@ function buildIsland(scene, world, rnd) {
     if (z > -2 && z < 22 && Math.abs(x) < 16) { m4.makeScale(0, 0, 0); pTrunk.setMatrixAt(i, m4); pCrown.setMatrixAt(i, m4); continue; }
     const s = 0.8 + rnd() * 0.6;
     m4.compose(p.set(x, 0.8 * s, z), q.identity(), sc.set(s, s, s)); pTrunk.setMatrixAt(i, m4);
-    m4.compose(p.set(x, 2.6 * s, z), q.identity(), sc.set(s, s * 0.9, s)); pCrown.setMatrixAt(i, m4); pCrown.setColorAt(i, c.setHex(pcols[i % 3]));
+    m4.compose(p.set(x, 2.6 * s, z), q.identity(), sc.set(s, s * (1.14+0.35*(i%3)), s)); pCrown.setMatrixAt(i, m4); pCrown.setColorAt(i, c.setHex(pcols[i % 3]));
     world.colliders.push({ x: isl.x + x, z: isl.z + z, radius: 0.9 * s });
   }
   pTrunk.castShadow = pCrown.castShadow = true;
@@ -842,6 +823,7 @@ function buildIsland(scene, world, rnd) {
       const cr = M(geo('oct', 0.7, 0), emis(cols[(i + k) % 4], 1.0)); cr.scale.set(1, 2.4 - k * 0.4, 1);
       cr.position.set((k - 1) * 0.6, 1.3 - k * 0.15, (k % 2) * 0.4 - 0.2); cr.castShadow = true; m.add(cr);
     }
+    add(m,M(geo('tor',1.2,0.09,6,12),mat(0xE2BD8C)),0,0.44,0).rotation.x=Math.PI/2;
     m.position.set(isl.x + nx, 0, isl.z + nz); scene.add(m);
     world.crystalNodes.push({ mesh: m, x: isl.x + nx, z: isl.z + nz, ready: true, timer: 0, id: i });
   });
@@ -870,6 +852,10 @@ function buildGateAndBridge(scene, world) {
   // Ponte: pivo na borda da fazenda, cresce em direcao a ilha
   const bridge = new THREE.Group(); bridge.position.set(isl.x, 0, -117);
   const len = 42;
+  for(let i=0;i<6;i++) for(const side of [-1,1]) {
+    add(bridge,M(geo('cyl',0.10,0.18,1.05,6),mat(0x507C83)),side*2.77,0.51,-2-i*7.4);
+    add(bridge,M(geo('sph',0.15,8,6),emis(0xFFE195,0.65)),side*2.77,1.09,-2-i*7.4);
+  }
   const deck = M(geo('box', 6, 0.5, len), mat(0xC9D8E4, { roughness: 0.6, metalness: 0.2 }));
   deck.position.set(0, -0.2, -len / 2); deck.receiveShadow = true; bridge.add(deck);
   const strip = M(geo('box', 0.35, 0.06, len), emis(0x4FE3C1, 1)); strip.position.set(0, 0.08, -len / 2); bridge.add(strip);

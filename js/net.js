@@ -1,8 +1,11 @@
+import {varySpecimen} from './botany.js';
+import { waterJet } from './water.js';
 // Multiplayer por codigo: um jogador cria a sala (host), os amigos entram pelo codigo.
 // Cada jogador joga na propria fazenda; as fazendas dos outros aparecem em terrenos vizinhos (somente visualizacao).
 // Transporte: WebRTC (PeerJS) por padrao; com ?net=local usa BroadcastChannel (duas abas do mesmo navegador, para testes).
+import { relayAddress, fixedRelay, setRelayAddress, connectRelay } from './relay.js';
 import * as THREE from 'three';
-import { state, save, stockFree } from './state.js';
+import { state, bus, save, stockFree } from './state.js';
 import { CONFIG } from './config.js';
 import { geo, mat, glow, makeLabel, createStructureModel, applyStructureLevel, animateStructure } from './world.js';
 import { addOutline } from './toon.js';
@@ -12,18 +15,20 @@ import { showToast, openModal, closeModal, el, row, setNetChip } from './ui.js';
 import { play } from './audio.js';
 import { restoreEventVisuals } from './events.js';
 
-const PREFIX = 'fazorb-', MAX_REMOTE = 3;
+const PREFIX = 'fazorb-v2-', MAX_REMOTE = 3;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 // Deslocamento das fazendas dos outros jogadores (a cidade e a estrada ficam compartilhadas)
-const SLOT_OFFSET = [{ x: 95, z: 0 }, { x: 0, z: 110 }, { x: 95, z: 110 }];
-const FARM_RECT = { x0: -74, x1: -4, z0: -62, z1: 10 };
+const SLOT_OFFSET = [{ x: 245, z: 0 }, { x: 0, z: 345 }, { x: 245, z: 345 }];
+const FARM_RECT = { x0: -104, x1: -4, z0: -104, z1: 18 };
 const LOCAL = new URLSearchParams(location.search).get('net') === 'local';
 
-let scene, camera, nickOf = () => 'Jogador';
+let scene, camera, world, nickOf = () => 'Jogador';
 const N = { mode: 'solo', code: null, tr: null, myId: null, remotes: new Map(), tPos: 0, tFarm: 0, tSync: 0, tCull: 0, last: { x: 0, z: 0, r: 0 }, clock: 0 };
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const inFarm = (x, z) => x > FARM_RECT.x0 && x < FARM_RECT.x1 && z > FARM_RECT.z0 && z < FARM_RECT.z1;
+const onIsland = (x,z) => Math.hypot(x-CONFIG.island.x,z-CONFIG.island.z) < CONFIG.island.radius-1;
+const onParcel = (x,z,island) => inFarm(x,z) || (island && onIsland(x,z));
 const newCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 
 // ---------------------------------------------------------------- Transportes
@@ -38,10 +43,23 @@ function loadPeerJS() {
   });
 }
 
-async function hostPeer(code, h) {
+async function openPeer(id) {
   await loadPeerJS();
-  const peer = new window.Peer(PREFIX + code, { debug: 0 });
-  await new Promise((res, rej) => { peer.on('open', res); peer.on('error', e => rej(new Error(e.type === 'unavailable-id' ? 'Codigo em uso, tente de novo' : 'Falha ao criar a sala'))); });
+  const peer = new window.Peer(id, { debug: 0 });
+  return new Promise((resolve, reject) => {
+    const failed = error => {
+      clearTimeout(timer); peer.destroy();
+      reject(new Error(error?.type === 'unavailable-id' ? 'Código em uso. Crie outra sala.' :
+        'Sinalização indisponível. Confira a internet ou abra o jogo pelo servidor do ZIP.'));
+    };
+    const timer = setTimeout(failed, 10000);
+    peer.once('error', failed);
+    peer.once('open', () => { clearTimeout(timer); peer.off('error', failed); resolve(peer); });
+  });
+}
+async function hostPeer(code, h) {
+  const peer = await openPeer(PREFIX + code);
+  peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
   const conns = new Map();
   peer.on('connection', c => {
     c.on('open', () => { conns.set(c.peer, c); h.onPeer(c.peer); });
@@ -58,15 +76,16 @@ async function hostPeer(code, h) {
 }
 
 async function joinPeer(code, h) {
-  await loadPeerJS();
-  const peer = new window.Peer(undefined, { debug: 0 });
-  await new Promise((res, rej) => { peer.on('open', res); peer.on('error', () => rej(new Error('Falha de conexao'))); });
+  const peer = await openPeer(undefined);
   const conn = peer.connect(PREFIX + code, { reliable: true });
-  await new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error('Sala nao encontrada')), 12000);
-    conn.on('open', () => { clearTimeout(t); res(); });
-    peer.on('error', e => { clearTimeout(t); rej(new Error(e.type === 'peer-unavailable' ? 'Sala nao encontrada' : 'Falha de conexao')); });
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      const failed = () => { clearTimeout(timer); reject(new Error('Sala inacessível. Confira o código e a conexão do anfitrião.')); };
+      const timer = setTimeout(failed, 12000);
+      peer.once('error', failed); conn.once('error', failed);
+      conn.once('open', () => { clearTimeout(timer); peer.off('error', failed); conn.off('error', failed); resolve(); });
+    });
+  } catch (error) { peer.destroy(); throw error; }
   conn.on('data', m => h.onMsg(null, m));
   conn.on('close', () => h.onGone());
   return { id: peer.id, sendHost(m) { if (conn.open) conn.send(m); }, close() { peer.destroy(); } };
@@ -81,7 +100,7 @@ async function hostLocal(code, h) {
     if (d.to !== id) return;
     if (d.kind === 'join') { peers.add(d.from); h.onPeer(d.from); }
     else if (d.kind === 'leave') { if (peers.delete(d.from)) h.onGone(d.from); }
-    else if (d.kind === 'msg') h.onMsg(d.from, d.msg);
+    else if (d.kind === 'msg' && peers.has(d.from)) h.onMsg(d.from, d.msg);
   };
   return {
     id,
@@ -100,7 +119,7 @@ async function joinLocal(code, h) {
   });
   ch.onmessage = e => { const d = e.data; if (d.to === id && d.kind === 'msg') h.onMsg(null, d.msg); };
   ch.postMessage({ to: hostId, from: id, kind: 'join' });
-  addEventListener('beforeunload', () => ch.postMessage({ to: hostId, from: id, kind: 'leave' }));
+
   return {
     id,
     sendHost(m) { ch.postMessage({ to: hostId, from: id, kind: 'msg', msg: m }); },
@@ -153,6 +172,11 @@ function makeAvatar(nick) {
     mk(geo('sph', 0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xF2D28B), 0, 1.46, 0);
     mk(geo('tor', 0.3, 0.035, 6, 16), mat(c2), 0, 1.49, 0).rotation.x = Math.PI / 2;
   }
+  mk(geo('box',0.36,0.3,0.09),mat(0x344B66),0,0.54,0.29);
+  for(const side of [-1,1]) {
+    mk(geo('box',0.067,0.29,0.08),mat(0x344B66),side*0.155,0.73,0.25).rotation.z=-side*0.13;
+    mk(geo('sph',0.03,6,4),mat(0xFFD074),side*0.14,0.65,0.35);
+  }
   g.add(rig);
   addOutline(body, 0.022); addOutline(head, 0.024);
   const label = makeLabel(nick, '#FFD166', 3.4, 0.76);
@@ -166,41 +190,47 @@ function makeAvatar(nick) {
 }
 
 function disposeTree(obj) {
-  obj.traverse(o => { if (o.material && o.material.map) o.material.map.dispose(); });
+  obj.traverse(o => {
+    if (o.isSprite && o.material.map) { o.material.map.dispose(); o.material.dispose(); }
+    if (o.userData.ownedGeometry) o.geometry.dispose();
+  });
 }
 
 function makeFarmView(nick, off) {
   const root = new THREE.Group(); root.position.set(off.x, 0, off.z);
   const soil = new THREE.Mesh(geo('box', 40, 0.2, 44), mat(0x8B5E3C)); soil.position.set(-32, 0.1, -24.5); soil.receiveShadow = true;
-  root.add(soil);
+  const land=new THREE.Mesh(geo('box',100,5,122),mat(0x83C878));
+  land.position.set(-54,-2.51,-43);land.receiveShadow=true;root.add(land,soil);
+  const island=new THREE.Mesh(geo('cyl',CONFIG.island.radius,CONFIG.island.radius-4,6,32),mat(0x78C7B0));
+  island.position.set(CONFIG.island.x,-3,CONFIG.island.z);island.visible=false;root.add(island);
   const label = makeLabel('FAZENDA DE ' + nick.toUpperCase(), '#FFD166', 8, 1.1); label.position.set(-32, 5, 1.5); root.add(label);
   const plotsG = new THREE.Group(), treesG = new THREE.Group(), structG = new THREE.Group();
   root.add(plotsG, treesG, structG);
   scene.add(root);
-  return { root, label, plotsG, treesG, structG, plots: new Map(), structs: new Map(), treeSig: '' };
+  return { root, island, label, plotsG, treesG, structG, plots: new Map(), structs: new Map(), treeSig: '' };
 }
 
 function applySnapshot(r, s) {
   const f = r.farm;
-  r.lvl = s.lvl;
+  r.lvl = s.lvl; f.island.visible = !!s.island;
   // canteiros
   const seen = new Set();
-  for (const [id, crop, frac, mut, , x, z, tower] of s.p) {
+  for (const [id, crop, frac, mut, sick, x, z, kind] of s.p) {
     seen.add(id);
     let p = f.plots.get(id);
     if (!p) {
       const g = new THREE.Group(); g.position.set(x, 0, z);
-      const soil = new THREE.Mesh(plotGeometry(tower ? 'tower' : 'farm'), vcMat); soil.receiveShadow = true; addOutline(soil, 0.05);
+      const soil = new THREE.Mesh(plotGeometry(kind === 2 ? 'island' : kind ? 'tower' : 'farm'), vcMat); soil.receiveShadow = true; addOutline(soil, 0.05);
       const plant = new THREE.Group(); plant.position.y = 0.4;
       g.add(soil, plant); f.plotsG.add(g);
       p = { g, plant, key: '' }; f.plots.set(id, p);
     }
-    const key = crop ? crop + ':' + Math.floor(frac * 5) + (frac >= 1 ? 'r' : '') + ':' + mut : '';
+    const key = crop ? crop + ':' + Math.floor(frac * 5) + (frac >= 1 ? 'r' : '') + ':' + mut + ':' + sick : '';
     if (key !== p.key) {
       p.key = key; p.plant.clear();
       if (crop && CONFIG.crops[crop]) {
-        const geom = cropGeometry(crop, frac, mut || null);
-        if (geom) { const m = new THREE.Mesh(geom, vcMat); p.plant.add(m); addOutline(m); }
+        const geom = cropGeometry(crop, frac, mut || null, !!sick);
+        if (geom) { const m = new THREE.Mesh(geom, vcMat); varySpecimen(m,x,z); p.plant.add(m); addOutline(m); }
         p.plant.scale.setScalar(mut === 'giant' ? 1.3 : 1);
       }
     }
@@ -215,7 +245,7 @@ function applySnapshot(r, s) {
       const geom = treeGeometry(type, frac, fruits);
       if (!geom) continue;
       const g = new THREE.Group(); g.position.set(x, 0, z);
-      const m = new THREE.Mesh(geom, vcMat); m.castShadow = true; g.add(m); addOutline(m);
+      const m = new THREE.Mesh(geom, vcMat); m.castShadow = true; varySpecimen(m,x,z); g.add(m); addOutline(m);
       f.treesG.add(g);
     }
   }
@@ -252,6 +282,8 @@ function addRemote(id, nick) {
 function removeRemote(id) {
   const r = N.remotes.get(id);
   if (!r) return;
+  const off=SLOT_OFFSET[r.slot];
+  if (onParcel(camera.position.x-off.x,camera.position.z-off.z,r.farm.island.visible)) camera.position.set(-32,1.7,0);
   refundPending(id);
   scene.remove(r.avatar, r.farm.root);
   disposeTree(r.avatar); disposeTree(r.farm.root);
@@ -264,13 +296,13 @@ function removeRemote(id) {
 function makeSnapshot() {
   const p = [];
   for (const q of state.plots) {
-    if (!q.available || q.kind === 'island') continue;
+    if (!q.available) continue;
     const growT = q.crop ? CONFIG.crops[q.crop].growTime : 1;
-    p.push([q.id, q.crop || 0, q.crop ? +Math.min(1, q.progress / growT).toFixed(2) : 0, q.mutation || 0, q.sick ? 1 : 0, q.x, q.z, q.kind === 'tower' ? 1 : 0]);
+    p.push([q.id, q.crop || 0, q.crop ? +Math.min(1, q.progress / growT).toFixed(2) : 0, q.mutation || 0, q.sick ? 1 : 0, q.x, q.z, q.kind === 'tower' ? 1 : q.kind === 'island' ? 2 : 0]);
   }
   const t = state.trees.map(x => [x.type, x.x, x.z, +Math.min(1, x.progress / CONFIG.trees[x.type].growTime).toFixed(2), x.fruits]);
   const s = state.structures.map(x => [x.type, x.x, x.z, x.level]);
-  return { lvl: state.level, p, t, s };
+  return { lvl: state.level, island:state.islandUnlocked, p, t, s };
 }
 
 function send(m) { // envia a mensagem para os outros (o host repassa)
@@ -278,10 +310,36 @@ function send(m) { // envia a mensagem para os outros (o host repassa)
 }
 const hello = () => ({ t: 'hi', id: N.myId, nick: nickOf() });
 
+function validSnapshot(s) {
+  if (!s || !Number.isFinite(s.lvl)) return false;
+  const list = (rows,check) => Array.isArray(rows) && rows.length <= 512 &&
+    rows.every(row => Array.isArray(row) && check(...row));
+  const frac = n => Number.isFinite(n) && n >= 0 && n <= 1;
+  return list(s.p,(id,crop,g,mut,sick,x,z,kind) =>
+    typeof id==='string' && (!crop || Object.hasOwn(CONFIG.crops,crop)) && frac(g) &&
+    (!mut || Object.hasOwn(CONFIG.mutations,mut)) && Number.isFinite(x) && Number.isFinite(z) && [0,1,2].includes(kind)) &&
+    list(s.t,(type,x,z,g,n)=>Object.hasOwn(CONFIG.trees,type) && Number.isFinite(x) &&
+      Number.isFinite(z) && frac(g) && Number.isInteger(n) && n>=0 && n<=CONFIG.trees[type].maxFruits) &&
+    list(s.s,(type,x,z,lvl)=>Object.hasOwn(CONFIG.structures,type) && Number.isFinite(x) &&
+      Number.isFinite(z) && Number.isInteger(lvl) && lvl>=1 && lvl<=10);
+}
+
 function handle(fromId, m) {
   if (!m || typeof m !== 'object') return;
-  if (m.t === 'full') { showToast('Sala cheia (maximo de 4 jogadores)', 'bad'); leave(true); return; }
-  if (m.t === 'sync') { if (N.mode === 'guest') applySync(m); return; }
+  if (m.t === 'bye' && N.mode === 'guest' && m.id === N.hostId) { leave(true); return; }
+
+  if (N.mode === 'host' && (!fromId || m.id !== fromId || ['sync','full'].includes(m.t))) return;
+  if (N.mode === 'host' && m.t !== 'hi' && !N.remotes.has(fromId)) return;
+  if (m.t === 'pos' && ![m.x, m.z, m.r].every(Number.isFinite)) return;
+  if (m.t === 'hi' && (typeof m.nick !== 'string' || m.nick.length > 32)) return;
+  if (m.t === 'farm' && !validSnapshot(m.s)) return;
+  if (m.t === 'full') { N.admission?.reject(new Error('Sala cheia (4 jogadores).')); showToast('Sala cheia (maximo de 4 jogadores)', 'bad'); leave(true); return; }
+  if (m.t === 'sync') {
+    if (N.mode==='guest' && m.id===N.hostId && Number.isFinite(m.time) &&
+        (!m.ev || (Object.hasOwn(CONFIG.events,m.ev.id) && Number.isFinite(m.ev.left))) &&
+        (!m.boom || (Object.hasOwn(CONFIG.crops,m.boom.crop) && Number.isFinite(m.boom.mult) && Number.isFinite(m.boom.left)))) applySync(m);
+    return;
+  }
   if (m.t === 'bye') { if (N.mode === 'host' && fromId) N.tr.broadcast(m, fromId); removeRemote(m.id); return; }
   if (!m.id || m.id === N.myId) return;
   if (m.to) { // mensagem direta (presentes): o host entrega apenas ao destinatario
@@ -295,7 +353,7 @@ function handle(fromId, m) {
       // apresenta o host e os demais ao novo jogador
       N.tr.sendTo(fromId, hello());
       N.tr.sendTo(fromId, { t: 'farm', id: N.myId, s: makeSnapshot() });
-      N.tSync = 0;
+      N.tSync = 0; N.tPos = 0;
       for (const r of N.remotes.values()) {
         N.tr.sendTo(fromId, { t: 'hi', id: r.id, nick: r.nick });
         if (r.snap) N.tr.sendTo(fromId, { t: 'farm', id: r.id, s: r.snap });
@@ -303,15 +361,24 @@ function handle(fromId, m) {
     }
     N.tr.broadcast(m, fromId); // repassa aos outros convidados
   }
-  if (m.t === 'hi') { addRemote(m.id, m.nick); return; }
+  if (m.t === 'hi') {
+    addRemote(m.id, m.nick);
+    if (N.mode==='guest' && !N.hostId) { N.hostId=m.id; N.admission?.resolve(); }
+    return;
+  }
   const r = N.remotes.get(m.id) || (m.t === 'farm' || m.t === 'pos' ? addRemote(m.id, null) : null);
   if (!r) return;
+  if (m.t === 'spray') {
+    const off=SLOT_OFFSET[r.slot];
+    if ([m.x,m.y,m.z,m.tx,m.ty,m.tz].every(Number.isFinite)) waterJet(m.x+off.x,m.y,m.z+off.z,m.tx+off.x,m.ty,m.tz+off.z,m.type);
+    return;
+  }
   if (m.t === 'pos') {
-    const off = SLOT_OFFSET[r.slot];
-    const inside = inFarm(m.x, m.z);
-    r.target.set(m.x + (inside ? off.x : 0), 0, m.z + (inside ? off.z : 0)); r.yaw = m.r;
+    const owner = m.farm ? N.remotes.get(m.farm) : null;
+    const off = owner ? SLOT_OFFSET[owner.slot] : null;
+    r.target.set(m.x + (off?.x || 0), 0, m.z + (off?.z || 0)); r.yaw = m.r;
     if (r.fresh) { r.pos.copy(r.target); r.fresh = false; }
-  } else if (m.t === 'farm') { r.snap = m.s; applySnapshot(r, m.s); }
+  } else if (m.t === 'farm') { const changed=!!m.s.island!==r.farm.island.visible; r.snap = m.s; applySnapshot(r, m.s); if(changed) refreshModal(); }
 }
 
 // ---------------------------------------------------------------- Presentes
@@ -340,9 +407,9 @@ export function giftName(kind, key) {
 function validGift(kind, key) {
   if (!GIFT_KINDS.includes(kind)) return false;
   if (kind === 'money' || kind === 'crystal') return true;
-  if (kind === 'mut') { const [mu, c] = String(key).split(':'); return !!(CONFIG.mutations[mu] && CONFIG.crops[c]); }
+  if (kind === 'mut') { const [mu, c] = String(key).split(':'); return Object.hasOwn(CONFIG.mutations,mu) && Object.hasOwn(CONFIG.crops,c); }
   const tbl = kind === 'seed' || kind === 'crop' ? CONFIG.crops : kind === 'sapling' || kind === 'fruit' ? CONFIG.trees : CONFIG.products;
-  return !!tbl[key];
+  return Object.hasOwn(tbl, key);
 }
 function sendTo(targetId, m) {
   m.id = N.myId; m.to = targetId;
@@ -351,7 +418,7 @@ function sendTo(targetId, m) {
 export function sendGift(toId, kind, key, n) {
   const r = N.remotes.get(toId);
   n = Math.floor(n);
-  if (!r || n < 1 || !validGift(kind, key)) return false;
+  if (!r || !Number.isSafeInteger(n) || n < 1 || n > 99999 || !validGift(kind, key)) return false;
   if (haveGift(kind, key) < n) { showToast('Voce nao tem essa quantidade', 'bad'); play('error'); return false; }
   takeGift(kind, key, n);
   const gid = rid() + rid();
@@ -364,7 +431,7 @@ export function sendGift(toId, kind, key, n) {
 function receiveGift(m) {
   const n = Math.floor(Number(m.n));
   const deny = why => sendTo(m.id, { t: 'giftno', gid: m.gid, why });
-  if (seenGifts.has(m.gid)) return;
+  if (seenGifts.has(m.gid)) { sendTo(m.id,{t:'giftok',gid:m.gid});return; }
   if (!(n >= 1 && n <= 99999) || !validGift(m.kind, m.key)) { deny('Presente invalido'); return; }
   if (STOCK_KINDS.includes(m.kind) && stockFree() < n) { deny('Estoque do amigo cheio'); return; }
   seenGifts.add(m.gid);
@@ -376,14 +443,14 @@ function receiveGift(m) {
 }
 function giftResult(m) {
   const p = pending.get(m.gid);
-  if (!p) return;
+  if (!p || m.id !== p.to) return;
   pending.delete(m.gid);
   const r = N.remotes.get(p.to), who = r ? r.nick : 'amigo';
   if (m.t === 'giftok') { play('buy'); showToast(who + ' recebeu ' + p.n + ' ' + giftName(p.kind, p.key), 'good'); }
   else { putGift(p.kind, p.key, p.n); play('error'); showToast('Presente devolvido: ' + (m.why || 'recusado'), 'bad'); save(); }
 }
 function refundPending(id) {
-  for (const [gid, p] of pending) if (p.to === id) { putGift(p.kind, p.key, p.n); pending.delete(gid); showToast('Presente devolvido: amigo saiu da sala', 'bad'); }
+  for (const [gid, p] of pending) if (p.to === id) { putGift(p.kind, p.key, p.n); pending.delete(gid); save(); showToast('Presente devolvido: amigo saiu da sala', 'bad'); }
 }
 
 // Host manda o relogio e o clima; convidados seguem o host (dia/noite e eventos iguais para todos)
@@ -404,21 +471,37 @@ function sendSync() {
 
 // Teleporta para a fazenda ou para perto do amigo
 export function visit(id, where) {
+  if (where === 'home') { camera.position.set(-32,1.7,0); return; }
   const r = N.remotes.get(id);
   if (!r) return;
   if (where === 'farm') { const o = SLOT_OFFSET[r.slot]; camera.position.set(o.x - 32, 1.7, o.z + 6); }
+  else if (where === 'island') {const o=SLOT_OFFSET[r.slot];camera.position.set(o.x+CONFIG.island.x,1.7,o.z+CONFIG.island.z+12);}
   else camera.position.set(r.pos.x, 1.7, r.pos.z + 3.5);
+  const target=camera.position;
+  if(!world.isWalkable(target.x,target.z)){
+    const x=target.x,z=target.z;
+    search: for(let d=1;d<=12;d++) for(let k=0;k<12;k++){
+      const px=x+d*Math.cos(k*Math.PI/6),pz=z+d*Math.sin(k*Math.PI/6);
+      if(world.isWalkable(px,pz)){ target.set(px,1.7,pz);break search; }
+    }
+  }
   play('build');
 }
 
-function sendFarm() { send({ t: 'farm', id: N.myId, s: makeSnapshot() }); }
+function sendFarm() {
+  const snapshot=makeSnapshot(), signature=JSON.stringify(snapshot);
+  if(signature===N.lastFarm) return;
+  N.lastFarm=signature;
+  send({t:'farm',id:N.myId,s:snapshot});
+}
 
 function setupTransportHandlers() {
   return {
     onPeer() {},
     onMsg: (from, m) => handle(from, m),
     onGone: from => {
-      if (N.mode === 'host') { if (from && N.remotes.has(from)) { N.tr.broadcast({ t: 'bye', id: from }); removeRemote(from); } }
+      if (!from && N.mode === 'host') { showToast('Conexão com o servidor encerrada', 'bad'); leave(true); }
+      else if (N.mode === 'host') { if (from && N.remotes.has(from)) { N.tr.broadcast({ t: 'bye', id: from }); removeRemote(from); } }
       else if (N.mode === 'guest') { showToast('A conexao com o host foi perdida', 'bad'); leave(true); }
     }
   };
@@ -429,11 +512,13 @@ export async function hostRoom() {
   if (N.mode !== 'solo') return { ok: false, error: 'Voce ja esta em uma sala' };
   try {
     const code = newCode();
-    N.tr = await (LOCAL ? hostLocal : hostPeer)(code, setupTransportHandlers());
-    N.mode = 'host'; N.code = code; N.myId = N.tr.id;
+    N.mode = 'joining';
+    const handlers = setupTransportHandlers();
+    N.tr = relayAddress() && !LOCAL ? await connectRelay('host', code, handlers) : await (LOCAL ? hostLocal : hostPeer)(code, handlers);
+    N.lastFarm = null; N.mode = 'host'; N.code = code; N.myId = N.tr.id;
     refreshChip();
     return { ok: true, code };
-  } catch (e) { N.tr = null; return { ok: false, error: e.message || 'Falha ao criar a sala' }; }
+  } catch (e) { N.mode = 'solo'; N.tr = null; return { ok: false, error: e.message || 'Falha ao criar a sala' }; }
 }
 
 export async function joinRoom(code) {
@@ -442,19 +527,31 @@ export async function joinRoom(code) {
   if (!/^[A-Z0-9]{6}$/.test(code)) return { ok: false, error: 'Codigo invalido (6 letras e numeros)' };
   try {
     N.mode = 'joining';
-    N.tr = await (LOCAL ? joinLocal : joinPeer)(code, setupTransportHandlers());
-    N.mode = 'guest'; N.code = code; N.myId = N.tr.id;
-    N.tr.sendHost(hello());
+    const handlers = setupTransportHandlers();
+    N.tr = relayAddress() && !LOCAL ? await connectRelay('join', code, handlers) : await (LOCAL ? joinLocal : joinPeer)(code, handlers);
+    N.lastFarm = null; N.hostId = null; N.mode = 'guest'; N.code = code; N.myId = N.tr.id;
+    let timer;
+    try {
+      await new Promise((resolve,reject)=>{
+        N.admission={resolve,reject};
+        timer=setTimeout(()=>reject(new Error('O anfitrião não confirmou sua entrada.')),9000);
+        N.tr.sendHost(hello());
+      });
+    } finally { clearTimeout(timer); N.admission=null; }
+    N.tPos = 0;
     sendFarm();
     refreshChip();
     showToast('Conectado a sala ' + code, 'mission');
     return { ok: true, code };
-  } catch (e) { N.mode = 'solo'; N.tr = null; return { ok: false, error: e.message || 'Falha ao entrar' }; }
+  } catch (e) { if(N.tr) leave(true); N.mode = 'solo'; N.tr = null; return { ok: false, error: e.message || 'Falha ao entrar' }; }
 }
 
 export function leave(silent) {
   if (N.mode === 'solo') return;
+  N.admission?.reject(new Error('Conexão encerrada antes de entrar na sala.'));
   try { send({ t: 'bye', id: N.myId }); } catch (e) { /* ignora */ }
+  N.mode = 'solo';
+  if ([...N.remotes.values()].some(r=>{const o=SLOT_OFFSET[r.slot];return onParcel(camera.position.x-o.x,camera.position.z-o.z,r.farm.island.visible);})) visit(null,'home');
   try { N.tr && N.tr.close(); } catch (e) { /* ignora */ }
   for (const id of [...N.remotes.keys()]) refundPending(id);
   for (const id of [...N.remotes.keys()]) { const r = N.remotes.get(id); scene.remove(r.avatar, r.farm.root); disposeTree(r.avatar); disposeTree(r.farm.root); N.remotes.delete(id); }
@@ -538,7 +635,18 @@ export function openMultiplayer() {
         inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') join(); });
         box.append(inp, go); list.append(box);
         body.append(list, msg);
-        body.append(el('p', 'hint', 'Conexao direta entre navegadores (WebRTC). Em redes muito restritivas a conexao pode falhar.'));
+        if (!fixedRelay && !LOCAL) {
+          const options=el('details'), title=el('summary',null,'Servidor de salas');
+          const addr=el('input','mp-input'); addr.type='url'; addr.placeholder='https://seu-servidor'; addr.value=relayAddress();
+          addr.style.textTransform='none'; addr.style.width='100%'; addr.setAttribute('aria-label','Endereço do servidor');
+          const confirm=el('button',null,'Aplicar'); confirm.onclick=()=>{
+            try { setRelayAddress(addr.value); status(relayAddress()?'Servidor selecionado.':'Conexão direta selecionada.'); }
+            catch(error) { status(error.message); }
+          };
+          options.append(title,el('p','hint','Para usar o servidor Node do jogo, informe o mesmo endereço nos dois dispositivos. Deixe vazio para usar PeerJS.'),addr,confirm);
+          body.append(options);
+        }
+        body.append(el('p', 'hint', relayAddress() ? 'Use o mesmo servidor de salas nos dois dispositivos.' : 'Conexão pela internet (WebRTC). Na mesma rede, você também pode usar o servidor incluído no ZIP.'));
       } else {
         const code = el('div', 'mp-code', N.code);
         body.append(el('p', 'hint', N.mode === 'host' ? 'Voce e o host. Passe este codigo aos amigos:' : 'Conectado a sala:'), code);
@@ -547,7 +655,9 @@ export function openMultiplayer() {
         for (const r of N.remotes.values()) list.append(row({ title: r.nick, desc: 'Nivel ' + (r.lvl || 1) + '  |  Fazenda a ' + (r.slot === 1 ? 'sul' : 'leste') + (r.slot === 2 ? ' (sudeste)' : '') + ' da cidade', tag: 'FAZENDA ' + (r.slot + 2), buttons: [
           { label: 'Dar presente', onClick: () => { openGift(r.id); return 'keep'; } },
           { label: 'Ver fazenda', onClick: () => { visit(r.id, 'farm'); return 'close'; } },
+          ...(r.farm.island.visible ? [{label:'Ver ilha',onClick:()=>{visit(r.id,'island');return 'close';}}] : []),
           { label: 'Ir ate ele', onClick: () => { visit(r.id, 'player'); return 'close'; } }] }));
+        list.append(row({title:'Minha fazenda',buttons:[{label:'Voltar para casa',onClick:()=>{visit(null,'home');return 'close';}}]}));
         list.append(row({ title: 'Sair da sala', desc: 'Seu progresso continua salvo na sua conta.', buttons: [{ label: 'Sair da sala', onClick: () => { leave(); return 'keep'; } }] }));
         body.append(list, msg);
       }
@@ -556,22 +666,53 @@ export function openMultiplayer() {
 }
 
 // ---------------------------------------------------------------- Ciclo
-export function initNet(sceneRef, cameraRef, getNick) {
+export function initNet(sceneRef, cameraRef, getNick, worldRef) {
   scene = sceneRef; camera = cameraRef; nickOf = getNick;
+  world = worldRef;
+  const zoneAt=world.zoneAt;
+  world.zoneAt=(x,z)=>{
+    for(const r of N.remotes.values()){
+      const off=SLOT_OFFSET[r.slot], px=x-off.x,pz=z-off.z;
+      if(onParcel(px,pz,r.farm.island.visible)) return (onIsland(px,pz)?'ILHA DE ':'FAZENDA DE ')+r.nick.toUpperCase();
+    }
+    return zoneAt(x,z);
+  };
+  const walkable = world.isWalkable;
+  world.isWalkable = (x,z) => {
+    if (walkable(x,z)) return true;
+    for (const r of N.remotes.values()) {
+      const off=SLOT_OFFSET[r.slot];
+      const px=x-off.x,pz=z-off.z;
+      if(!onParcel(px,pz,r.farm.island.visible)) continue;
+      if(r.snap?.t.some(([,tx,tz])=>Math.hypot(px-tx,pz-tz)<0.85)) return false;
+      if(r.snap?.s.some(([key,sx,sz])=>Math.hypot(px-sx,pz-sz)<CONFIG.structures[key].radius*0.6+0.3)) return false;
+      return true;
+    }
+    return false;
+  };
+  bus.on('irrigate', data => { if (N.tr) send({t:'spray',id:N.myId,...data}); });
   addEventListener('beforeunload', () => leave(true));
 }
 
-const tmpDir = new THREE.Vector3(), tmpW = new THREE.Vector3();
+const tmpDir = new THREE.Vector3();
 export function updateNet(dt) {
   if (N.mode !== 'host' && N.mode !== 'guest') return;
   N.clock += dt;
   const play_ = state.mode === 'play';
   // posicao: ~10 vezes por segundo, ou a cada 1 segundo parado
   N.tPos -= dt;
-  if (play_ && N.tPos <= 0) {
-    const x = +camera.position.x.toFixed(2), z = +camera.position.z.toFixed(2), r = +camera.rotation.y.toFixed(2);
-    const moved = Math.abs(x - N.last.x) + Math.abs(z - N.last.z) + Math.abs(r - N.last.r) > 0.02;
-    if (moved || N.tPos < -1) { send({ t: 'pos', id: N.myId, x, z, r }); N.last = { x, z, r }; N.tPos = 0.1; } else N.tPos = 0.1;
+  if (N.tPos <= 0) {
+    let x = camera.position.x, z = camera.position.z, farm = onParcel(x,z,state.islandUnlocked) ? N.myId : null;
+    for (const remote of N.remotes.values()) {
+      const off = SLOT_OFFSET[remote.slot];
+      if (!onParcel(x-off.x,z-off.z,remote.farm.island.visible)) continue;
+      x -= off.x; z -= off.z; farm = remote.id; break;
+    }
+    camera.getWorldDirection(tmpDir);
+    const r = Math.atan2(-tmpDir.x, -tmpDir.z);
+    send({ t: 'pos', id: N.myId, farm, x: +x.toFixed(2), z: +z.toFixed(2), r });
+    const moved = x !== N.last.x || z !== N.last.z || r !== N.last.r;
+    N.last = {x, z, r}; N.tPos = play_ && moved ? 0.1 : 0.25;
   }
   N.tFarm -= dt;
   if (N.tFarm <= 0) { N.tFarm = 2; sendFarm(); }
@@ -589,13 +730,14 @@ export function updateNet(dt) {
     ud.rig.position.y = Math.abs(Math.sin(ph)) * 0.09 * r.walk;
     ud.arms[0].rotation.x = Math.sin(ph) * 0.9 * r.walk; ud.arms[1].rotation.x = -Math.sin(ph) * 0.9 * r.walk;
     r.avatar.rotation.y = r.yaw + Math.PI;
-    const l = r.avatar.userData.label; if (l) { l.getWorldPosition(tmpW); tmpDir.set(camera.position.x, tmpW.y, camera.position.z); l.lookAt(tmpDir); }
+
     if (r.farm.root.visible) for (const g of r.farm.structs.values()) animateStructure(g, N.clock, dt);
-    r.farm.label.getWorldPosition(tmpW); r.farm.label.lookAt(camera.position.x, tmpW.y, camera.position.z);
+
   }
   N.tCull -= dt;
   if (N.tCull <= 0) {
     N.tCull = 0.7;
-    for (const r of N.remotes.values()) { const o = SLOT_OFFSET[r.slot]; r.farm.root.visible = Math.hypot(camera.position.x - (o.x - 32), camera.position.z - (o.z - 24)) < 150; }
+    for (const r of N.remotes.values()) { const o = SLOT_OFFSET[r.slot]; const x=camera.position.x-o.x,z=camera.position.z-o.z;
+      r.farm.root.visible = Math.hypot(x+54,z+43)<160 || (r.farm.island.visible && Math.hypot(x-CONFIG.island.x,z-CONFIG.island.z)<140); }
   }
 }

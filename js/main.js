@@ -37,12 +37,12 @@ const dynamic = new Set([world.clouds, world.water, world.islandRocks, world.bri
 const underDynamic = o => { for (let p = o; p; p = p.parent) if (dynamic.has(p) || (world.overlays && world.overlays.includes(p))) return true; return false; };
 const skipMerge = o => underDynamic(o) || o.material === world.gateMat || o.userData.keep || (o.material && o.material.emissiveIntensity > 0.3) || !o.visible;
 scene.children.slice().forEach(g => { if (g.isGroup && !dynamic.has(g) && !(world.overlays && world.overlays.includes(g))) mergeGroupStatic(g, skipMerge); });
-scene.traverse(o => { if (o.isLight || dynamic.has(o)) return; o.matrixAutoUpdate = false; o.updateMatrix(); });
+scene.traverse(o => { if (o.isLight || o === world.sun.target || dynamic.has(o)) return; o.matrixAutoUpdate = false; o.updateMatrix(); });
 
 const player = createPlayer(camera, renderer.domElement);
 scene.add(camera);
 initGame(scene, camera, world);
-initNet(scene, camera, () => session.nick);
+initNet(scene, camera, () => session.nick, world);
 restoreEventVisuals();
 
 // ---------- Qualidade e resolucao dinamica ----------
@@ -108,7 +108,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(raw, 0.05);
   player.update(dt, world);
   updateGame(dt);
-  updateNet(dt);
+  updateNet(Math.min(raw, 0.5));
   if (++frame % 3 === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
 
@@ -118,8 +118,8 @@ renderer.setAnimationLoop(() => {
   adjustTimer += dt;
   if (adjustTimer >= 2 && warmup <= 0) {
     adjustTimer = 0;
-    if (ema > 24 && resScale > 0.5) { resScale = Math.max(0.5, resScale - 0.15); applyResolution(); goodChecks = 0; }
-    else if (ema < 15) { if (++goodChecks >= 4 && resScale < 1) { resScale = Math.min(1, resScale + 0.1); applyResolution(); goodChecks = 0; } }
+    if (ema > 24 && resScale > 0.7) { resScale = Math.max(0.7, resScale - 0.1); applyResolution(); goodChecks = 0; }
+    else if (ema < 18) { if (++goodChecks >= 4 && resScale < 1) { resScale = Math.min(1, resScale + 0.1); applyResolution(); goodChecks = 0; } }
     else goodChecks = 0;
   }
 });
