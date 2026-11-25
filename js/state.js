@@ -143,6 +143,7 @@ export function save() {
     islandUnlocked: state.islandUnlocked, islandVisited: state.islandVisited, visitors: state.visitors, pickups: state.pickups, nextPickupId: state.nextPickupId,
     plots: state.plots.map(p => ({ id: p.id, x: p.x, z: p.z, crop: p.crop, progress: p.progress, water: p.water, sick: p.sick, lastCrop: p.lastCrop, mutation: p.mutation }))
   };
+  queueSave(data);
   try { localStorage.setItem(saveKey, JSON.stringify(data)); } catch (e) { /* armazenamento cheio ou bloqueado */ }
 }
 
@@ -179,5 +180,7 @@ export function load() {
 }
 
 export function clearSave() {
+  queueSave(null);
   try { localStorage.removeItem(saveKey); } catch (e) { /* ignora */ }
 }
+import {queueSave} from './cloud.js';

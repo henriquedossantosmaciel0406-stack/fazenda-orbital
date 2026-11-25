@@ -10,6 +10,7 @@
 <body>
 <div id="app">
 <canvas id="game"></canvas>
+<p id="syncStatus" role="status" hidden style="position:fixed;bottom:1rem;left:1rem;z-index:99;background:white;color:black;padding:.5rem"></p>
 
 <div id="hud" class="hidden">
   <div id="crosshair"></div>
@@ -63,32 +64,34 @@
 <div id="login" class="screen hidden">
   <div class="menu-card auth">
     <h1>Fazenda Orbital</h1>
-    <div class="seg auth-tabs"><button id="tabLogin" type="button" class="active">Entrar</button><button id="tabRegister" type="button">Criar conta</button></div>
+    <div class="seg auth-tabs"><button id="tabLogin" type="button" class="active">Entrar</button><button id="tabRegister" type="button">Criar conta</button><button id="tabRecover" type="button" hidden>Recuperar</button></div>
     <form id="authForm" autocomplete="on">
       <label>Nick<input id="authNick" maxlength="16" autocomplete="username" spellcheck="false" placeholder="seu nick"/></label>
       <label>Senha<input id="authPass" type="password" autocomplete="current-password" placeholder="sua senha"/></label>
+      <label id="recoverRow" class="hidden">Chave de recuperação<input id="recoverKey" autocomplete="off" placeholder="Chave recebida no cadastro"/></label>
       <label id="authPass2Row" class="hidden">Repetir senha<input id="authPass2" type="password" autocomplete="new-password" placeholder="repita a senha"/></label>
       <label class="check"><input id="authRemember" type="checkbox" checked/> Manter conectado neste navegador</label>
       <p id="authMsg" class="auth-msg"></p>
       <button id="authSubmit" type="submit">Entrar</button>
     </form>
-    <p class="fine">Sem email. As contas ficam salvas neste navegador e nao ha recuperacao de senha.</p>
+    <p id="authLocation" class="fine"></p>
   </div>
 </div>
 
 <div id="menu" class="screen hidden">
   <div class="menu-card">
     <h1>Fazenda Orbital</h1>
+    <aside id="recoveryNotice" hidden><strong>Guarde sua chave de recuperação</strong><p>Com ela você pode criar outra senha. Copie e guarde em um lugar privado.</p><code id="recoveryCode"></code><button id="recoveryDismiss" class="link" type="button">Já guardei</button></aside>
     <div id="accountBar"><span>Conta <b id="accountName">-</b></span><button id="logoutBtn" type="button" class="link">Trocar de conta</button></div>
-    <p>Plante, regue e colha com drones, pesquise, cumpra contratos e descubra a Ilha Cristalina.</p>
+    <p>Cultive sua fazenda, explore a vila e prepare sua primeira viagem ao espaço. O Porto Orbital abre no nível 12.</p>
     <button id="startBtn" type="button">Jogar</button>
     <button id="mpBtn" type="button" class="secondary">Multiplayer</button>
     <div class="row2">
-      <button id="settingsBtn" type="button" class="secondary">Configuracoes</button>
+      <button id="settingsBtn" type="button" class="secondary">Configurações</button>
       <button id="resetBtn" type="button" class="secondary">Apagar progresso</button>
     </div>
     <div class="controls">
-      <span>WASD mover</span><span>Mouse olhar</span><span>E interagir</span><span>1-9 e Tab hotbar</span><span>I inventario</span><span>G drones</span><span>C contratos</span><span>P pausa</span>
+      <span>WASD mover</span><span>Espaço pular</span><span>Mouse olhar</span><span>E interagir</span><span>1-9 e Tab hotbar</span><span>I mochila</span><span>G drones</span><span>C contratos</span><span>P pausa</span>
     </div>
   </div>
 </div>

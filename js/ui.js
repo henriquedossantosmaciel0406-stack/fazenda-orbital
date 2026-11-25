@@ -480,39 +480,63 @@ export function setNetChip(text) {
 }
 
 // Tela de login e cadastro: resolve com o nick quando a conta entra
-export function showLogin() {
-  return new Promise(resolve => {
-    const auto = location.search.includes('relogin') ? null : autoLogin();
-    if (auto) { resolve({ nick: auto.nick, imported: false, created: false }); return; }
-    const box = $('login'), form = $('authForm'), msg = $('authMsg');
-    let mode = 'login', busy = false;
-    $('menu').classList.add('hidden'); $('hud').classList.add('hidden');
-    box.classList.remove('hidden');
-    $('authNick').value = lastNick(); $('authPass').value = ''; $('authPass2').value = ''; msg.textContent = '';
-    const setMode = m => {
-      mode = m; msg.textContent = '';
-      $('tabLogin').classList.toggle('active', m === 'login'); $('tabRegister').classList.toggle('active', m === 'register');
-      $('authPass2Row').classList.toggle('hidden', m === 'login');
-      $('authSubmit').textContent = m === 'login' ? 'Entrar' : 'Criar conta e jogar';
-      $('authPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+export async function showLogin() {
+  const remember = () => $('authRemember').checked;
+  const enter = r => {
+    enterCloud(r,saveKeyFor(r.nick));
+    if(r.recovery){
+      $('recoveryCode').textContent=r.recovery.match(/.{4}/g).join('-');
+      $('recoveryNotice').hidden=false;
+      $('recoveryDismiss').onclick=()=>{$('recoveryNotice').hidden=true;$('recoveryCode').textContent='';};
+    }
+    return {nick:r.nick,imported:!!r.imported};
+  };
+  if(!location.search.includes('relogin')){
+    const auto=hosted?await api('session'):autoLogin();
+    if(auto?.ok)return hosted?enter(auto):auto;
+  }
+  return new Promise(resolve=>{
+    const box=$('login'),form=$('authForm'),msg=$('authMsg');
+    let mode='login',busy=false;
+    $('authLocation').textContent=hosted?'Conta e fazenda ficam salvas neste servidor.':'Modo local. Contas e progresso ficam neste navegador.';
+    $('tabRecover').hidden=!hosted;
+    box.classList.remove('hidden');$('menu').classList.add('hidden');
+    $('authNick').value=lastNick();$('authPass').value='';
+    const setMode=m=>{
+      mode=m;msg.textContent='';
+      for(const [id,value] of [['tabLogin','login'],['tabRegister','register'],['tabRecover','recover']])$(id).classList.toggle('active',m===value);
+      $('authPass2Row').classList.toggle('hidden',m==='login');
+      $('recoverRow').classList.toggle('hidden',m!=='recover');
+      $('authPass').autocomplete=m==='login'?'current-password':'new-password';
+      $('authPass').placeholder=m==='recover'?'nova senha':'sua senha';
+      $('authSubmit').textContent=m==='login'?'Entrar':m==='recover'?'Redefinir senha':'Criar conta e jogar';
     };
-    $('tabLogin').onclick = () => setMode('login');
-    $('tabRegister').onclick = () => setMode('register');
-    setMode('login');
-    form.onsubmit = async e => {
-      e.preventDefault();
-      if (busy) return;
-      const nick = $('authNick').value, pass = $('authPass').value;
-      if (mode === 'register' && pass !== $('authPass2').value) { msg.textContent = 'As senhas nao conferem'; return; }
-      busy = true; $('authSubmit').disabled = true; msg.textContent = 'Verificando...';
-      const r = mode === 'login' ? await login(nick, pass) : await register(nick, pass);
-      busy = false; $('authSubmit').disabled = false;
-      if (!r.ok) { msg.textContent = r.error; play('error'); return; }
-      setRemember(r.nick, $('authRemember').checked);
-      box.classList.add('hidden');
-      resolve({ nick: r.nick, imported: !!r.imported, created: mode === 'register' });
+    $('tabLogin').onclick=()=>setMode('login');$('tabRegister').onclick=()=>setMode('register');$('tabRecover').onclick=()=>setMode('recover');setMode('login');
+    form.onsubmit=async e=>{
+      e.preventDefault();if(busy)return;
+      const nick=$('authNick').value.trim(),pass=$('authPass').value;
+      if(mode!=='login'&&pass!==$('authPass2').value){msg.textContent='As senhas não conferem.';return;}
+      busy=true;$('authSubmit').disabled=true;msg.textContent='Verificando…';
+      try{
+        let r;
+        if(hosted){
+          const data={nick,pass,remember:remember(),code:$('recoverKey').value};
+          const local=Object.hasOwn(JSON.parse(localStorage.getItem('fazenda-accounts-v1')||'{}'),nick.toLowerCase());
+          const migrating=local&&(mode==='register'||mode==='login')&&(await login(nick,pass)).ok;
+          if(mode==='register'&&local&&!migrating){msg.textContent='Para importar esta fazenda, use a senha da conta local.';return;}
+          const initialSave=migrating?JSON.parse(localStorage.getItem(saveKeyFor(nick))||'null'):null;
+          if(mode==='register'&&initialSave)data.initialSave=initialSave;
+          r=await api(mode,data);
+          if(mode==='login'&&r.status===401&&migrating){
+            const created=await api('register',{...data,initialSave});if(created.ok)r={...created,imported:true};else if(created.status!==409)r=created;
+          }
+        }else r=mode==='register'?await register(nick,pass):await login(nick,pass);
+        if(!r.ok){msg.textContent=r.error;play('error');return;}
+        if(!hosted)setRemember(r.nick,remember());
+        box.classList.add('hidden');resolve(hosted?enter(r):r);
+      }catch{msg.textContent='Falha ao abrir a conta. Tente novamente.';}
+      finally{busy=false;$('authSubmit').disabled=false;}
     };
-    setTimeout(() => $(lastNick() ? 'authPass' : 'authNick').focus(), 50);
   });
 }
 
@@ -540,17 +564,21 @@ export function bindUI(cb) {
     updateHUD();
   });
   let confirmReset = false;
-  $('resetBtn').addEventListener('click', e => {
+  $('resetBtn').addEventListener('click', async e => {
     e.preventDefault();
     if (!confirmReset) {
       confirmReset = true; $('resetBtn').textContent = 'Clique de novo para confirmar';
       setTimeout(() => { confirmReset = false; $('resetBtn').textContent = 'Apagar progresso'; }, 3500);
       return;
     }
-    clearSave(); location.reload();
+    clearSave(); if(!hosted||await settle())location.reload();
   });
   $('mpBtn').addEventListener('click', e => { e.preventDefault(); initAudio(); onMultiplayerCb(); });
-  $('logoutBtn').addEventListener('click', e => { e.preventDefault(); setRemember('', false); onLogoutCb(); });
+  $('logoutBtn').addEventListener('click', async e => {
+    e.preventDefault();
+    if(hosted){await settle();const r=await api('logout',{});if(!r.ok){showToast(r.error,'bad');return;}}
+    setRemember('',false);onLogoutCb();
+  });
   $('settingsBtn').addEventListener('click', e => { e.preventDefault(); initAudio(); openSettings(); });
 
   $('modalClose').addEventListener('click', () => { if (state.mode === 'menu') closeModal(false); else closeModal(); });
@@ -573,3 +601,5 @@ export function bindUI(cb) {
   });
   document.addEventListener('pointerlockerror', () => { if (state.mode === 'play' && !modal) showResume(true); });
 }
+import {hosted, api, enterCloud, settle} from './cloud.js';
+import {saveKeyFor} from './accounts.js';

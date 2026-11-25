@@ -1,3 +1,4 @@
+import {connectHttpRoom} from './http-relay.js';
 // O servidor empacotado anuncia o endereço do WebSocket no HTML.
 const embedded = document.querySelector('meta[name="orbital-relay"]')?.content;
 const setting = 'fazenda-servidor-de-salas';
@@ -16,6 +17,7 @@ export function setRelayAddress(value) {
   localStorage.setItem(setting,address.href);
 }
 export function connectRelay(action, code, handlers) {
+  if(embedded==='/api/room')return connectHttpRoom(action,code,handlers);
   return new Promise((resolve, reject) => {
     const url = new URL(relayAddress(), location.href);
     url.protocol = ['https:','wss:'].includes(url.protocol) ? 'wss:' : 'ws:';
