@@ -1,5 +1,5 @@
 import {CANS,canLevel,canEfficiency} from './gear.js';
-import {makeFarmer,animateFarmer,companion} from './actors.js';
+import {companion} from './actors.js';
 import {createWateringCan} from './watering-can.js';
 import { initWater, updateWater, waterJet } from './water.js';
 import { fillCrop, fillTree, varySpecimen } from './botany.js';
@@ -49,8 +49,7 @@ let wateringCan, myPet;
 const ghosts = {}, treeGhosts = {};
 let ghostRing, ringOk, ringBad;
 const pickupMeshes = new Map();
-const visitors = [];
-let tipTimer = 0, irrSoundT = 0, treeSkip = null;
+let irrSoundT = 0, treeSkip = null;
 let clock = 0, hudTimer = 0, saveTimer = 0, achTimer = 0, zoneTimer = 0, availTimer = 0, cullTimer = 0;
 
 // temporarios reutilizados (sem alocar no loop)
@@ -1111,59 +1110,6 @@ function bindInteraction() {
 // ======================================================================
 //  VISITANTES
 // ======================================================================
-function createVisitors() {
-  for(let i=0;i<6;i++){
-    const g=makeFarmer(i+3);scene.add(g);g.visible=false;
-    visitors.push({ group: g, target: new THREE.Vector3(), wait: 0, active: false, atStruct: false, phase: Math.random() * 6 });
-  }
-}
-
-function pickVisitorTarget(v) {
-  const spots = state.structures.length + state.trees.length;
-  if (spots && Math.random() < 0.7) {
-    const k = Math.floor(Math.random() * spots);
-    const o = k < state.structures.length ? state.structures[k] : state.trees[k - state.structures.length];
-    const rad = (k < state.structures.length ? CONFIG.structures[o.type].radius : 1) + 1.4;
-    const a = Math.random() * Math.PI * 2;
-    v.target.set(o.x + Math.cos(a) * rad, 0, o.z + Math.sin(a) * rad); v.atStruct = true;
-  } else {
-    for (let k = 0; k < 8; k++) {
-      const x = -58 + Math.random() * 46, z = -2 + Math.random() * 14;
-      if (Math.hypot(x + 36, z - 5) < 3.5 || Math.hypot(x + 22, z - 6) < 5) continue;
-      v.target.set(x, 0, z); break;
-    }
-    v.atStruct = false;
-  }
-}
-
-function updateVisitors(dt, t) {
-  const want = Math.min(visitors.length, Math.floor(reputation() / 20));
-  tipTimer -= dt;
-  for (let i = 0; i < visitors.length; i++) {
-    const v = visitors[i], g = v.group;
-    if (i >= want) { if (v.active) { v.active = false; g.visible = false; } continue; }
-    if (!v.active) { v.active = true; g.visible = true; g.position.set(-9, 0, 14 + i); pickVisitorTarget(v); v.wait = 0; }
-    animateFarmer(g,t+v.phase,v.wait>0?0:1);
-    if (v.wait > 0) { v.wait -= dt; g.position.y = 0; continue; }
-    tmpV.set(v.target.x - g.position.x, 0, v.target.z - g.position.z);
-    const d = tmpV.length();
-    if (d < 0.5) {
-      v.wait = 3 + Math.random() * 4;
-      if (v.atStruct && tipTimer <= 0 && !state.paused) {
-        const tip = Math.round(3 + reputation() * 0.12);
-        addMoney(tip); state.visitors++; tipTimer = 25;
-        burst(g.position.x, 1.8, g.position.z, 0xFFD166, 8, 1, 2);
-        showToast('Visitante elogiou a fazenda: +' + tip + ' CR', 'good');
-      }
-      pickVisitorTarget(v);
-    } else {
-      tmpV.multiplyScalar(1.7 * dt / d);
-      g.position.x += tmpV.x; g.position.z += tmpV.z;
-      g.rotation.y = Math.atan2(tmpV.x, tmpV.z);
-      g.position.y = Math.abs(Math.sin(t * 7 + v.phase)) * 0.06;
-    }
-  }
-}
 
 // ======================================================================
 //  RECURSOS, DIA/NOITE, CULLING
@@ -1251,7 +1197,6 @@ export function initGame(sceneRef, cameraRef, worldRef) {
     state.pickups.push(p); addPickupMesh(p);
   });
 
-  createVisitors();
   api = {
     get plots() { return state.plots; },
     get trees() { return state.trees; },
@@ -1289,7 +1234,6 @@ export function updateGame(dt) {
   updateIrrigators(dt);
   updateInstances(dt, clock);
   updateDrones(dt, camera, clock);
-  updateVisitors(dt, clock);
   updateEffects(dt);
   world.update(dt,state.time,state.event?.id);
 

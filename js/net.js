@@ -225,7 +225,7 @@ function addRemote(id, nick) {
   let slot = 0; while (used.has(slot)) slot++;
   if (slot >= SLOT_OFFSET.length) return null;
   nick = nick || 'Jogador';
-  r = { id, nick, slot, lvl: 1, avatar: makeAvatar(nick), pet:companion(scene), petType:null, farm: makeFarmView(nick, SLOT_OFFSET[slot]), pos: new THREE.Vector3(), target: new THREE.Vector3(), yaw: 0, snap: null, fresh: true };
+  r = { id, nick, slot, lvl: 1, avatar: makeAvatar(nick), pet:companion(scene), petType:null, farm: makeFarmView(nick, SLOT_OFFSET[slot]), pos: new THREE.Vector3(), velocity: new THREE.Vector3(), receivedAt:0, target: new THREE.Vector3(), yaw: 0, snap: null, fresh: true };
   scene.add(r.avatar);
   N.remotes.set(id, r);
   showToast(nick + ' entrou na sala', 'good'); play('mission');
@@ -285,6 +285,7 @@ function handle(fromId, m) {
   if (N.mode === 'host' && (!fromId || m.id !== fromId || ['sync','full'].includes(m.t))) return;
   if (N.mode === 'host' && m.t !== 'hi' && !N.remotes.has(fromId)) return;
   if (m.t === 'pos' && ![m.x, m.z, m.r].every(Number.isFinite)) return;
+  if(m.t==='pos'&&N.tr?.directPoses&&fromId&&N.mode==='guest'&&(fromId!==m.id||!N.remotes.has(m.id)))return;
   if (m.t === 'hi' && (typeof m.nick !== 'string' || m.nick.length > 32)) return;
   if (m.t === 'farm' && !validSnapshot(m.s)) return;
   if (m.t === 'full') { N.admission?.reject(new Error('Sala cheia (4 jogadores).')); showToast('Sala cheia (maximo de 4 jogadores)', 'bad'); leave(true); return; }
@@ -313,7 +314,7 @@ function handle(fromId, m) {
         if (r.snap) N.tr.sendTo(fromId, { t: 'farm', id: r.id, s: r.snap });
       }
     }
-    N.tr.broadcast(m, fromId); // repassa aos outros convidados
+    if(m.t!=='pos'||!N.tr.directPoses)N.tr.broadcast(m,fromId);
   }
   if (m.t === 'hi') {
     addRemote(m.id, m.nick);
@@ -332,6 +333,8 @@ function handle(fromId, m) {
     const off = owner ? SLOT_OFFSET[owner.slot] : null;
     r.petType=Object.hasOwn(PETS,m.pet)?m.pet:null;
     r.target.set(m.x + (off?.x || 0), Number.isFinite(m.jump)?Math.min(2,Math.max(0,m.jump)):0, m.z + (off?.z || 0)); r.yaw = m.r;
+    r.receivedAt=N.clock;
+    r.velocity.set(Number.isFinite(m.vx)?m.vx:0,0,Number.isFinite(m.vz)?m.vz:0).clampLength(0,16);
     if (r.fresh) { r.pos.copy(r.target); r.fresh = false; }
   } else if (m.t === 'farm') { const changed=!!m.s.island!==r.farm.island.visible; r.snap = m.s; applySnapshot(r, m.s); if(changed) refreshModal(); }
 }
@@ -649,7 +652,7 @@ export function initNet(sceneRef, cameraRef, getNick, worldRef) {
   addEventListener('beforeunload', () => leave(true));
 }
 
-const tmpDir = new THREE.Vector3();
+const tmpDir = new THREE.Vector3(), predicted = new THREE.Vector3();
 export function updateNet(dt) {
   if (N.mode !== 'host' && N.mode !== 'guest') return;
   N.clock += dt;
@@ -669,9 +672,14 @@ export function updateNet(dt) {
     x=+x.toFixed(2);z=+z.toFixed(2);
     const yaw=+r.toFixed(3),pet=state.activePet;
     const moved=x!==N.last.x||z!==N.last.z||yaw!==N.last.r||jump!==N.last.jump||farm!==N.last.farm||pet!==N.last.pet;
-    if(moved || N.clock-(N.last.sent??-Infinity)>=1){
-      send({t:'pos',jump,pet,id:N.myId,farm,x,z,r:yaw});
-      N.last={x,z,r:yaw,jump,farm,pet,sent:N.clock};
+    const elapsed=N.clock-(N.last.sent??N.clock);
+    const continuous=farm===N.last.farm && elapsed>0 && Math.hypot(x-N.last.x,z-N.last.z)<=16*elapsed;
+    const vx=continuous?+((x-N.last.x)/elapsed).toFixed(1):0;
+    const vz=continuous?+((z-N.last.z)/elapsed).toFixed(1):0;
+    const stopped=!moved && (N.last.vx||N.last.vz);
+    if(moved || stopped || N.clock-(N.last.sent??-Infinity)>=1){
+      send({t:'pos',jump,pet,id:N.myId,farm,x,z,vx,vz,r:yaw});
+      N.last={x,z,vx,vz,r:yaw,jump,farm,pet,sent:N.clock};
     }
     N.tPos=play_?0.07:0.25;
   }
@@ -682,10 +690,12 @@ export function updateNet(dt) {
   // avatares suaves + etiquetas sempre de frente + estruturas animadas
   const k = 1 - Math.exp(-dt * 17);
   for (const r of N.remotes.values()) {
-    if (r.pos.distanceToSquared(r.target) > 900) r.pos.copy(r.target); else r.pos.lerp(r.target, k);
+    predicted.copy(r.target).addScaledVector(r.velocity,Math.min(0.10,N.clock-r.receivedAt));
+    if (r.pos.distanceToSquared(predicted)>900) r.pos.copy(r.target);
+    else r.pos.lerp(predicted,k);
     r.avatar.position.copy(r.pos);
     // andar: pulinho e bracos balancando enquanto ele se move
-    const sp = r.pos.distanceTo(r.target);
+    const sp = r.pos.distanceTo(predicted);
     r.walk = THREE.MathUtils.lerp(r.walk || 0, sp > 0.05 ? 1 : 0, k);
     animateFarmer(r.avatar,N.clock,r.walk,r.pos.y);
     r.pet.update(r.petType,r.pos,dt,N.clock,world);

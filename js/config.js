@@ -123,6 +123,8 @@ export const CONFIG = {
   },
 
   events: {
+    tempest: { name:'Temporal de monção',kind:'climate',weight:1,level:3,duration:48,text:'Frente de monção: nuvens baixas e chuva forte abastecem os reservatórios.' },
+    aurora: { name:'Aurora de plasma',kind:'climate',weight:1,level:4,duration:60,text:'Aurora de plasma: a geração de energia aumenta em 45%.' },
     rain:    { name: 'Chuva',             kind: 'climate', weight: 3, level: 1, duration: 50, text: 'Chuva: agua extra e plantas crescem mais rapido.' },
     drought: { name: 'Seca',              kind: 'climate', weight: 2, level: 2, duration: 60, text: 'Seca: pouca agua e a umidade evapora mais rapido.' },
     solar:   { name: 'Tempestade solar',  kind: 'climate', weight: 2, level: 3, duration: 50, text: 'Tempestade solar: geracao de energia muito reduzida.' },

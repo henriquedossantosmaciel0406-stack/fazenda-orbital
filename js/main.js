@@ -71,6 +71,7 @@ function applyQuality() {
   renderer.shadowMap.enabled = sun.castShadow = !!preset.shadow;
   renderer.shadowMap.type = q==='alta' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   world.clouds.visible=preset.clouds;
+  world.clouds.getObjectByName('Bancos de nuvem').castShadow=q==='alta';
   world.skyPlanet.visible=preset.planet;
   world.skyPlanet.children[1].visible=q==='alta';
   world.stars.geometry.setDrawRange(0,preset.stars);

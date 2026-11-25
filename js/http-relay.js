@@ -11,6 +11,7 @@ export async function connectHttpRoom(op,code,handlers){
   const {id,token,size}=await request({op});
   let active=true,timer,seq=1,after=0,pending=null,failures=0,alone=size===1;
   const queue=[];
+  let movingUntil=0;
   let inFlight=false, due=Infinity, retrying=false;
   function schedule(ms){
     const deadline=performance.now()+ms;
@@ -47,10 +48,12 @@ export async function connectHttpRoom(op,code,handlers){
       seq++;pending=null;failures=0;retrying=false;alone=reply.size===1;
       for(const event of reply.events){
         if(!active)break;
+        if(event.msg?.t==='pos')movingUntil=performance.now()+450;
         after=event.cursor;if(event.gone)handlers.onGone(event.from);else handlers.onMsg(event.from,event.msg);
       }
       const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
-      delay=reply.events.length>=64||(!alone&&urgent)?12:alone?650:130;
+      const idleDelay=alone?650:performance.now()<movingUntil?55:130;
+      delay=reply.events.length>=64||(!alone&&urgent)?12:idleDelay;
     }catch(e){
       if(!active)return;
       if((e.status>=400&&e.status<500&&e.status!==429)||++failures>=7){
@@ -60,5 +63,5 @@ export async function connectHttpRoom(op,code,handlers){
     }finally{inFlight=false;if(active)schedule(delay||235);}
   }
   addEventListener('pagehide',close);schedule(10);
-  return {id,close,sendHost:msg=>enqueue({msg}),sendTo:(to,msg)=>enqueue({to,msg}),broadcast:(msg,except)=>enqueue({except,msg})};
+  return {id,close,directPoses:true,sendHost:msg=>enqueue({msg}),sendTo:(to,msg)=>enqueue({to,msg}),broadcast:(msg,except)=>enqueue({except,msg})};
 }

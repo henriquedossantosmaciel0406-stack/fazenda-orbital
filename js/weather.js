@@ -24,7 +24,8 @@ export function rainField(scene) {
       float speed=mix(13.,19.,rnd(key+54.2));
       float t=fract(uTime*speed/21.+rnd(key+23.3));
       float height=(1.-t)*21.;
-      vec3 pos=vec3(ground.x-height*0.16,height,ground.y-height*0.06);
+      float wind=0.16+max(0.,uRain-0.8)*(0.55+0.22*sin(uTime*1.7));
+      vec3 pos=vec3(ground.x-height*wind,height,ground.y-height*0.06);
       uvDrop=corner;
       #ifdef SPLASH
         float radius=0.025+(t*5.)*0.16;
@@ -32,7 +33,7 @@ export function rainField(scene) {
         alpha=(1.-smoothstep(0.,0.19,t))*0.46*uRain;
         gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.);
       #else
-        pos+=vec3(-0.16,1.,-0.06)*corner.y*mix(0.40,0.89,rnd(key+74.));
+        pos+=vec3(-wind,1.,-0.06)*corner.y*mix(0.40,0.89,rnd(key+74.));
         vec4 mv=modelViewMatrix*vec4(pos,1.);
         mv.x+=corner.x*mix(0.018,0.034,rnd(key+93.));
         alpha=(0.25+0.4*rnd(key+11.))*(1.-0.65*corner.y)*smoothstep(0.35,2.5,-mv.z)*uRain;
@@ -72,30 +73,54 @@ export function rainField(scene) {
 export function cloudField(scene,random) {
   const count=72,puffs=6,layout=[];
   const group=new THREE.Group();group.name='Camadas de nuvens';
-  const m=new THREE.MeshLambertMaterial({color:0xFFF9ED,emissive:0x555C73,emissiveIntensity:0.26,flatShading:true});
+  const m=new THREE.MeshLambertMaterial({color:0xFFF9ED,emissive:0x555C73,emissiveIntensity:0.26,flatShading:false});
   const field=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),m,count*puffs);
+  field.name='Bancos de nuvem';
+  const puffColor=new THREE.Color();
+  for(let i=0;i<field.count;i++){
+    const edge=Math.abs((i%puffs)-2.5)/2.5;
+    field.setColorAt(i,puffColor.setRGB(0.81+0.19*edge,0.85+0.15*edge,0.93+0.07*edge));
+  }
   field.frustumCulled=false;field.instanceMatrix.setUsage(THREE.DynamicDrawUsage);group.add(field);scene.add(group);
   for(let i=0;i<count;i++){
     const parts=[];const radius=4+random()*6;
     for(let j=0;j<puffs;j++)parts.push([(j-2.5)*radius*0.61,(j>0&&j<5?1:0)*random()*radius*0.52,(random()-0.5)*radius,0.56+random()*0.43]);
     layout.push({x:random()*720-270,z:random()*760-320,y:44+random()*41,radius,speed:1+random()*1.6,parts});
   }
+  const curtain=new THREE.Mesh(new THREE.CylinderGeometry(195,197,48,64,1,true),
+    new THREE.ShaderMaterial({
+      uniforms:{phase:{value:0}},side:THREE.DoubleSide,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader:`varying vec2 vUv;uniform float phase;
+        void main(){float a=vUv.x*6.2831853;
+          float foot=.27+.10*sin(4.*a+phase)+.08*sin(9.*a-phase*.6);
+          float y=vUv.y-foot;
+          float band=smoothstep(0.,.08,y)*(1.-smoothstep(.08,.55,y));
+          float folds=.60+.24*sin(34.*a+phase)+.13*sin(83.*a-phase);
+          gl_FragColor=vec4(mix(vec3(.20,.91,.61),vec3(.61,.39,.92),smoothstep(.0,.40,y)),band*folds*.66);
+        }`
+    }));
+  curtain.position.set(0,59,-14);curtain.visible=false;group.add(curtain);
   const dummy=new THREE.Object3D(), dark=new THREE.Color(0x6F7D91),clear=new THREE.Color(0xFFF9ED),sunset=new THREE.Color(0xF4C199);
   let cover=0,wind=0,tick=1;
   function update(dt,time,event){
-    const storm=event==='rain'?1:event==='solar'?0.67:event==='drought'?-0.63:0;
+    curtain.visible=event==='aurora';
+    if(curtain.visible)curtain.material.uniforms.phase.value+=dt*.36;
+    const storm=event==='tempest'?1.25:event==='rain'?0.78:event==='solar'?0.67:event==='drought'?-0.63:0;
     cover+=(storm-cover)*(1-Math.exp(-dt*0.7));wind+=dt*(1+Math.max(0,cover)*1.85);
     if((tick+=dt)<0.13)return;tick=0;
-    m.color.copy(clear).lerp(dark,Math.max(0,cover));
+    const shade=THREE.MathUtils.clamp(cover,0,1);
+    m.color.copy(clear).lerp(dark,shade);
     const dusk=Math.max(0,1-Math.min(Math.abs(time-6),Math.abs(time-18))/2);
-    m.color.lerp(sunset,dusk*(1-Math.max(0,cover))*0.52);
+    m.color.lerp(sunset,dusk*(1-shade)*0.52);
     m.emissiveIntensity=time<6||time>19?0.20:0.38;
     let id=0;
     for(const layer of layout){
       const x=((layer.x+270+wind*layer.speed)%720)-270, z=layer.z+Math.sin(wind*0.012+layer.x)*4;
       const radius=layer.radius*(1+cover*0.64);
       for(const [ox,oy,oz,k] of layer.parts){
-        dummy.position.set(x+ox*(1+cover*0.44),layer.y-cover*10+oy,z+oz);
+        const gust=Math.sin(wind*.19+layer.x*.04);
+        dummy.position.set(x+ox*(1+cover*.55)+oy*cover,layer.y-cover*11+oy*(1+Math.max(0,cover)) + gust*cover,z+oz);
         dummy.scale.set(radius*k*1.34,radius*k*(0.58+Math.max(0,cover)*0.23),radius*k);dummy.updateMatrix();field.setMatrixAt(id++,dummy.matrix);
       }
     }

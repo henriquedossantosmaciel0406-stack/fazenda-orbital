@@ -10,6 +10,8 @@ import { createUrgent } from './contracts.js';
 // Aparencia do ceu/luz durante eventos (interpolada a cada quadro, sem alocar)
 export const weatherVisual = { color: new THREE.Color(0x000000), amount: 0, light: 1 };
 const TARGETS = {
+  tempest: {color:new THREE.Color(0x394866),amount:0.74,light:0.39},
+  aurora: {color:new THREE.Color(0x69CBBC),amount:0.32,light:1.08},
   none:    { color: new THREE.Color(0x000000), amount: 0,    light: 1 },
   rain:    { color: new THREE.Color(0x5F7A99), amount: 0.55, light: 0.6 },
   drought: { color: new THREE.Color(0xE8B96A), amount: 0.35, light: 1.15 },
@@ -22,10 +24,10 @@ let bannerTimer = 0, solarFlashTimer = 0;
 
 // ---- Multiplicadores consultados por outros sistemas ----
 export const growthEventMult = () => (eventActive('rain') ? 1.5 : eventActive('rainbow') ? 1.25 : 1);
-const GOOD = new Set(['rain', 'rainbow', 'festival']);
+const GOOD = new Set(['rain', 'rainbow', 'festival','aurora']);
 export const evaporationMult = () => (eventActive('drought') ? 1 + 1.5 * (1 - mitigation()) : 1);
-export const energyEventMult = () => (eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : 1);
-export const rainWaterGain = () => (eventActive('rain') ? 0.4 : 0);
+export const energyEventMult = () => eventActive('aurora')?1.45:(eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : 1);
+export const rainWaterGain = () => eventActive('tempest') ? 0.85 : (eventActive('rain') ? 0.4 : 0);
 export const sellEventMult = crop => (state.boom && state.boom.crop === crop ? state.boom.mult : 1) * (eventActive('festival') ? 1.25 : 1);
 
 function pickEvent() {
@@ -48,6 +50,7 @@ export function triggerEvent(id) {
   const def = CONFIG.events[id];
   if (!def) return;
   if (def.kind === 'climate') {
+    if(state.event)endClimate();
     const bad = !GOOD.has(id);
     state.event = { id, left: def.duration * (bad ? 1 - 0.4 * mitigation() : 1) };
     if (id === 'pest') {
@@ -100,7 +103,7 @@ export function initEvents() { restoreEventVisuals(); }
 export function restoreEventVisuals() {
   const t = TARGETS[state.event ? state.event.id : 'none'] || TARGETS.none;
   weatherVisual.color.copy(t.color); weatherVisual.amount = t.amount; weatherVisual.light = t.light;
-  setRain(state.event && state.event.id === 'rain' ? 1 : 0);
+  setRain(eventActive('tempest')?1.4:eventActive('rain')?1:0);
 }
 
 export function updateEvents(dt) {
@@ -125,7 +128,7 @@ export function updateEvents(dt) {
   weatherVisual.color.lerp(t.color, k);
   weatherVisual.amount += (t.amount - weatherVisual.amount) * k;
   weatherVisual.light += (t.light - weatherVisual.light) * k;
-  if (eventActive('rain')) setRain(1);
+  setRain(eventActive('tempest')?1.4:eventActive('rain')?1:0);
   if (eventActive('solar')) { solarFlashTimer -= dt; if (solarFlashTimer <= 0) { flash('solar'); solarFlashTimer = 5 + Math.random() * 4; } }
 
   // Aviso no HUD

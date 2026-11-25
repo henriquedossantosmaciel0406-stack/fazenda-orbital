@@ -52,7 +52,9 @@ if seq~=me.batch and seq~=me.batch+1 then return {409,'Sequência da sala desatu
 if seq==me.batch+1 then
   local packets=cjson.decode(ARGV[8])
   for _,p in ipairs(packets) do
-    if id~=room.host then post(room.host,id,p.wire)
+    if p.pose and id~=room.host then
+      for target in pairs(members) do if target~=id then post(target,id,p.wire) end end
+    elseif id~=room.host then post(room.host,id,p.wire)
     elseif p.to then if members[p.to] and p.to~=id then post(p.to,'',p.wire) end
     else for target in pairs(members) do if target~=id and target~=p.except then post(target,'',p.wire) end end end
   end
@@ -83,7 +85,8 @@ module.exports=async function handle(req,res){
           if(!p?.msg||typeof p.msg.t!=='string'||(p.to&&!identity.test(p.to))||(p.except&&!identity.test(p.except)))throw fail(400,'Mensagem da sala inválida.');
           const wire=JSON.stringify(p.msg);
           if(Buffer.byteLength(wire)>65536)throw fail(413,'Mensagem grande demais.');
-          return {wire,...(p.to?{to:p.to}:{}),...(p.except?{except:p.except}:{})};
+          const pose=p.msg.t==='pos'&&p.msg.id===id&&!p.msg.to&&!p.to&&!p.except&&[p.msg.x,p.msg.z,p.msg.r].every(Number.isFinite);
+          return {wire,pose,...(p.to?{to:p.to}:{}),...(p.except?{except:p.except}:{})};
         });
       }
     }

@@ -386,6 +386,29 @@ export function toggleInventory() {
 }
 
 // ---------- Pausa, configuracoes, estatisticas, conquistas ----------
+let adminSession=false;
+function openAdmin(){
+  openModal({id:'admin',title:'Observatório · ADM',hint:'Comandos para sua fazenda. Em sala, o anfitrião transmite o clima.',build(body){
+    const list=el('div','menu-list');body.append(list);
+    for(const id of ['rain','tempest','aurora','meteor']){
+      const b=menuButton(CONFIG.events[id].name,async()=>{
+        b.disabled=true;
+        const {netInfo}=await import('./net.js');
+        if(id!=='meteor' && netInfo().mode==='guest'){
+          b.disabled=false;showToast('Crie a sala para controlar o clima.','info');return;
+        }
+        const r=await api('admin',{event:id});
+        b.disabled=false;
+        if(!r.ok){showToast(r.error,'bad');return;}
+        if(modalId()!=='admin')return;
+        const {triggerEvent}=await import('./events.js');
+        closeModal();triggerEvent(r.event);save();
+      });
+      list.append(b);
+    }
+    list.append(menuButton('Voltar',openPauseMenu,'secondary'));
+  }});
+}
 function menuButton(label, fn, cls = '') {
   const b = el('button', 'big ' + cls, label);
   b.type = 'button';
@@ -400,6 +423,7 @@ export function openPauseMenu() {
       const box = el('div', 'menu-list');
       box.append(
         menuButton('Continuar', () => closeModal()),
+        ...(adminSession?[menuButton('Observatório ADM',openAdmin)]:[]),
         menuButton('Mochila',()=>{closeModal(false);toggleInventory();},'secondary'),
         menuButton('Salvar', () => { save(); showToast('Jogo salvo', 'good'); play('buy'); }),
         menuButton('Multiplayer', () => onMultiplayerCb(), 'secondary'),
@@ -510,6 +534,7 @@ export function setNetChip(text) {
 export async function showLogin() {
   const remember = () => $('authRemember').checked;
   const enter = r => {
+    adminSession=r.orbitalPass===true;
     enterCloud(r,saveKeyFor(r.nick));
     if(r.recovery){
       $('recoveryCode').textContent=r.recovery.match(/.{4}/g).join('-');

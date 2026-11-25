@@ -8,11 +8,13 @@ const up = new THREE.Vector3(0, 1, 0);
 const blend = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
 
 // Folha fechada com nervura, borda ondulada e ponta recurvada.
-function leafGeometry() {
+function leafGeometry(kind='blade') {
   const vertices = [], indices = [];
   for (let row = 0; row <= 8; row++) {
-    const t = row / 8, width = 0.005 + Math.sin(Math.PI*t) ** 0.8 * (1.08 - 0.24*t);
-    const y = 0.19*Math.sin(Math.PI*t) - 0.12*t*t;
+    const t=row/8, arch=Math.sin(Math.PI*t);
+    const lobes=kind==='lobed'?1+.28*Math.cos(row*Math.PI*.72):1;
+    const width=.005+arch**(kind==='petal'?.55:.9)*(kind==='petal'?.50+t:1.08-.24*t)*lobes;
+    const y=(kind==='petal'?.30:.22)*arch-(kind==='blade'?.26:.08)*t*t;
     const rim = y + (row % 2 ? 0.06 : 0) * width;
     vertices.push(-width,rim,t, 0,y+0.16*width,t, width,rim,t, 0,y-0.045*width,t);
     if (row < 8) for (let j=0; j<4; j++) {
@@ -24,7 +26,7 @@ function leafGeometry() {
   g.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3)); g.setIndex(indices);
   g.computeVertexNormals(); return g;
 }
-const blade = leafGeometry();
+const blades={blade:leafGeometry(),lobed:leafGeometry('lobed'),petal:leafGeometry('petal')};
 // A mesma muda mantém sua orientação após salvar, crescer ou ser vista por um visitante.
 export function varySpecimen(mesh,x,z) {
   const seed=Math.sin(x*12.9898+z*78.233)*43758.5453;
@@ -32,12 +34,12 @@ export function varySpecimen(mesh,x,z) {
   mesh.rotation.y=fraction*TAU;
   mesh.scale.set(0.95+fraction*0.10,0.91+(1-fraction)*0.18,0.97+fraction*0.06);
 }
-function tools(parent) {
+function tools(parent,kind='blade') {
   function part(shape, color, x,y,z, sx=1,sy=1,sz=1) {
     const m = new THREE.Mesh(shape, mat(color)); m.position.set(x,y,z); m.scale.set(sx,sy,sz); parent.add(m); return m;
   }
   function leaf(x,y,z, angle,length,width,lift,color) {
-    const m = part(blade,color,x,y,z,width,length,length);
+    const m = part(blades[kind],color,x,y,z,width,length,length);
     m.rotation.order='YXZ'; m.rotation.set(-lift,angle,0,'YXZ'); return m;
   }
   function rod(a,b,r,color, taper=0.7) {
@@ -52,10 +54,12 @@ function tools(parent) {
 
 export function fillCrop(P,key,g,ready,sick,mutation) {
   const group = new THREE.Group(); P.add(group);
-  const {leaf,rod,oval,gem,part}=tools(group);
+  const leafKind=['flower','lotus'].includes(key)?'petal':['lettuce','strawberry','grape','pumpkin','melon','tomato'].includes(key)?'lobed':'blade';
+  const {leaf,rod,oval,gem,part}=tools(group,leafKind);
   const base=CONFIG.crops[key].color;
   const col=sick ? 0xB99550 : mutation ? blend(base,mutation.color,0.65) : base;
-  const fern=sick ? 0x817346 : 0x397F56, mint=sick ? 0xADA053 : 0x95C75F;
+  const greens={lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
+  const fern=sick?0x817346:greens[key],mint=sick?0xADA053:blend(fern,0xEBF997,.48);
   const scale=0.32+0.68*g, ripe=g>0.55;
   group.scale.setScalar(scale);
   const ring=(x,y,z,n,r,w,pitch,color,phase=0)=> {
@@ -111,7 +115,8 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
       const a=j*spiral,x=j?Math.sin(a)*0.62:0,z=j?Math.cos(a)*0.62:0,k=j?0.54+(j%2)*0.14:1;
       rod([x,0,z],[x+0.07,0.85*k,z],0.15*k,0xEDDECB);
       const y=0.84*k;
-      part(geo('sph',1,14,7,0,TAU,0,Math.PI/2),col,x+0.07,y,z,0.64*k,0.39*k,0.64*k);
+      part(geo('sph',1,14,7,0,TAU,0,Math.PI/2),col,x+0.07,y,z,0.61*k,0.52*k,0.61*k);
+      part(geo('tor',.59*k,.033*k,5,16),blend(col,0xFFE5C9,.55),x+.07,y+.02*k,z).rotation.x=Math.PI/2;
       oval(x+0.07,y,z,0.63*k,0.066*k,0.63*k,0xFFD4BB);
       for(let i=0;i<7;i++) { const b=i*spiral,r=(0.22+0.065*(i%3))*k; oval(x+0.07+Math.sin(b)*r,y+Math.sqrt(1-(r/(0.64*k))**2)*0.385*k,z+Math.cos(b)*r,0.075*k,0.03*k,0.075*k,0xFFF2DA); }
     }
@@ -169,7 +174,7 @@ export function fillTree(P,type,g,fruits) {
     const a=i*TAU/n+0.25,dx=Math.sin(a),dz=Math.cos(a);
     const radius=type==='orange'?r*(1.22-i*0.10):r;
     const x=lean+dx*radius,z=dz*radius,y=type==='orange'?h-0.58+i*0.26:h+(i%2)*0.28;
-    const tint=blend(def.crown,i%2?0xFFECAA:0x195745,i%2?0.23:0.15);
+    const tint=blend(def.crown,i%2?0xFFE6A1:0x265F68,i%2?0.32:0.22);
     if(palm) {
       leaf(...top,a,1.78,0.18,0.19,tint);
       for(let j=1;j<=5;j++) for(const side of [-1,1])
@@ -195,6 +200,20 @@ export function fillTree(P,type,g,fruits) {
   if(!palm) {
     if(ice) gem(lean,h+0.72,0,0.51,1.21,0.51,def.crown);
     else part(geo('ico',1,1),def.crown,lean,h+0.61,0,w*1.45,depth*1.21,w*1.4);
+  }
+  if(type==='peach'||type==='orange'||type==='apple'){
+    const bloom=type==='peach'?0xFCC7C1:type==='orange'?0xFFF0CB:0xFFE4D4;
+    for(let i=0;i<anchors.length;i++){
+      const [x,y,z]=anchors[i];
+      leaf(x,y+.10,z,i*spiral,.41,.13,.28,blend(def.crown,0xE1F5A3,.32));
+      if(g>.4 && !fruits){
+        for(let j=0;j<5;j++){
+          const a=j*TAU/5;
+          oval(x+Math.sin(a)*.08,y+.02,z+Math.cos(a)*.08,.073,.042,.07,bloom);
+        }
+        oval(x,y+.05,z,.045,.034,.045,0xEEBE61);
+      }
+    }
   }
   if(g<1) return;
   for(let i=0;i<Math.min(fruits,def.maxFruits);i++) {

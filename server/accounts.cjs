@@ -67,6 +67,11 @@ module.exports=async function api(req,res,route,attempt=0){
       await issue(req,res,a,!!data.remember);return send(200,{...view(a),recovery});
     }
     const {a,key}=await current(req);
+    if(route==='admin'){
+      if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
+      if(!['tempest','aurora','rain','meteor'].includes(data.event))throw fail(400,'Evento desconhecido.');
+      return send(200,{ok:true,event:data.event});
+    }
     if(route==='save'){
       if(data.nick!==a.nick)throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
       if(data.revision!==a.revision)throw fail(409,'Há progresso mais recente em outro navegador. Reabra o jogo para carregá-lo.');
