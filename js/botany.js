@@ -154,6 +154,76 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
   }
 }
 
+// Um único volume por fruto evita que duas cascas quase coincidentes pisquem ao longe.
+const fruitSkins=new Map();
+function fruitSkin(type) {
+  if(fruitSkins.has(type))return fruitSkins.get(type);
+  const shape=new THREE.SphereGeometry(1,16,12);
+  const pos=shape.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
+    const angle=Math.atan2(z,x);
+    let width=1,height=y;
+    if(type==='apple'){
+      width=1+.14*y+.045*Math.cos(5*angle)*(1-y*y);
+      height=y-.22*Math.max(0,y)**10+.08*Math.max(0,-y)**9;
+    }else if(type==='peach'){
+      const crease=Math.exp(-18*x*x)*Math.max(0,z);
+      width=1+.13*y-.16*crease;
+      height=y-.16*Math.max(0,y)**8;
+    }else if(type==='coconut'){
+      width=1+.18*y+.045*Math.cos(3*angle);
+    }
+    pos.setXYZ(i,x*width,height,z*width);
+  }
+  shape.computeVertexNormals();fruitSkins.set(type,shape);return shape;
+}
+
+const fruitSize={
+  apple:[.27,.28,.26],orange:[.245,.235,.245],peach:[.28,.29,.25],
+  cherry:[.164,.15,.16],coconut:[.225,.32,.205],crystaltree:[.195,.34,.195]
+};
+
+function addRipeFruit(group,type,anchor,angle,slot) {
+  const [ax,ay,az]=anchor;
+  const [w,h,d]=fruitSize[type];
+  const dx=Math.sin(angle),dz=Math.cos(angle);
+  const crown=new THREE.Group();
+  const branch=tools(group);
+  const reach=type==='coconut' ? .34 : .20;
+  const x=ax+dx*reach, z=az+dz*reach;
+  const drop=(type==='cherry' ? .44 : .26)+.06*(slot%2);
+  const tip=ay-drop;
+  branch.rod(anchor,[x,tip,z],type==='coconut' ? .048 : .026, type==='cherry'?0x779143:0x8A6945);
+  crown.position.set(x,tip-h*.76,z);
+  crown.rotation.y=angle;
+  group.add(crown);
+  const {part,leaf,oval,gem}=tools(crown);
+  const color=CONFIG.trees[type].fruitColor;
+  if(type==='crystaltree'){
+    gem(0,0,0,w,h,d,color);
+    gem(-.057,.038,.12,.044,.09,.023,0xFFBDFA);
+    part(geo('cyl',.055,.088,.07,6),0x76C2CA,0,h*.84,0);
+  }else{
+    part(fruitSkin(type),type==='coconut'?0x99673F:color,0,0,0,w,h,d);
+    if(type==='coconut'){
+      for(const [px,py] of [[-.065,.045],[.064,.045],[0,-.05]])
+        oval(px,py,.194,.029,.034,.018,0x513827);
+    }else if(type==='orange'){
+      for(let i=0;i<5;i++)leaf(0,h*.97,0,i*TAU/5,.105,.032,-.34,0x589354);
+      for(const [px,py] of [[-.10,.04],[-.058,.092],[-.128,-.015]]){
+        const pz=d*Math.sqrt(1-(px/w)**2-(py/h)**2);
+        oval(px,py,pz,.014,.013,.009,0xFFD379);
+      }
+    }else if(type==='cherry'){
+      oval(-.054,.046,.141,.034,.019,.012,0xFFB2AC);
+    }else{
+      leaf(0,h*.85,0,.94,.21,.069,.18,0x629F55);
+      if(type==='apple')oval(-.082,.075,.246,.033,.052,.012,0xFFB49E);
+    }
+  }
+}
+
 const crowns = {
   apple: [5,1.05,1.75,0.70,0.73], orange:[7,0.82,2.05,0.60,0.93],
   peach:[4,1.27,1.48,0.80,0.49], cherry:[8,1.46,2.06,0.62,0.38],
@@ -216,16 +286,19 @@ export function fillTree(P,type,g,fruits) {
     }
   }
   if(g<1) return;
-  for(let i=0;i<Math.min(fruits,def.maxFruits);i++) {
-    const [ax,ay,az]=anchors[i%n],x=ax+(i>=n?0.26:0),z=az+(i>=n?0.11:0);
-    const y=ay-(type==='cherry'?0.42:0.25)-(i>=n?0.23:0);
-    rod([ax,ay+0.04,az],[x,y+0.06,z],0.028,bark);
-    if(ice) gem(x,y-0.08,z,0.22,0.32,0.22,def.fruitColor);
-    else {
-      const rad=type==='cherry'?0.145:palm?0.24:0.20;
-      oval(x,y-rad*0.6,z,rad,palm?0.28:rad*0.96,rad,def.fruitColor);
-      if(type==='peach'||type==='apple') oval(x+0.075,y-rad*0.6,z+0.035,rad*0.72,rad*0.93,rad*0.84,blend(def.fruitColor,0xE86C61,0.28));
-      leaf(x,y+0.05,z,i*spiral,rad*1.32,rad*0.37,0.23,0x558D55);
+  // As posições dependem do ramo, nunca da quantidade de frutos restantes.
+  for(let i=0;i<Math.min(fruits,def.maxFruits);i++){
+    const slot=(i*(n%2===0?n-1:2))%n;
+    const angle=slot*TAU/n+.25;
+    const [ax,ay,az]=anchors[slot];
+    const paired=i%n<def.maxFruits-n;
+    const offset=paired?(i<n?-.32:.32):0;
+    const anchor=palm?[lean+Math.sin(angle)*.21,h-.035,Math.cos(angle)*.21]:
+      [ax+Math.cos(angle)*offset,ay+.13,az-Math.sin(angle)*offset];
+    if(ice){
+      // O graveto sai da ponta real do galho, no interior do cristal azul.
+      rod([lean+Math.sin(angle)*r,h+(slot%2)*.28,Math.cos(angle)*r],anchor,.046,0x8ABBC7);
     }
+    addRipeFruit(group,type,anchor,angle,i);
   }
 }
