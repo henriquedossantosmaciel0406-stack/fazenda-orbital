@@ -35,10 +35,16 @@ export function dungeon(canvas,r,t){
       if(seed<3)poly(c,[[dx+10,dy+8],[dx+17,dy+5],[dx+23,dy+8],[dx+16,dy+10]],'#a2aba0');
     }else{
       c.fillStyle=seed%3===0?'#505f71':'#495969';c.fillRect(dx+1,dy+1,38,38);
+      if(r.sector===2&&!r.room){
+        c.fillStyle=['#567787','#59888a','#628f89'][seed%3];c.fillRect(dx,dy,S,S);
+        c.strokeStyle='#8cb9aa';c.beginPath();c.moveTo(dx+4,dy+29);c.quadraticCurveTo(dx+12,dy+24,dx+22,dy+29);c.stroke();
+        if(seed===1)poly(c,[[dx+24,dy+19],[dx+28,dy+5],[dx+33,dy+20]],'#ca98cd',ink);
+      }
       if(seed<3){c.fillStyle='#718391';c.fillRect(dx+5+seed*3,dy+26,3,2);}
     }
   }
   r.danger.forEach(v=>at(v,()=>{c.fillStyle='#ff955dbb';c.fillRect(-18,-19,36,36);poly(c,[[-8,7],[0,-8],[8,7]],'#713c41');}));
+  at(r.trader,()=>{ellipse(c,0,7,13,10,'#784888',ink);ellipse(c,0,-4,12,10,'#93edb6',ink);for(const x of [-5,5])ellipse(c,x,-5,3,4,ink);});
   at(r.portal,()=>{ellipse(c,0,2,17,14,'#202d39',ink);ellipse(c,0,2,12,9,r.ore>=3?'#77e9b7':'#959eaa');ellipse(c,0,2,9,6,'#394857');});
   at(r.kit,()=>{c.fillStyle='#eacb84';c.fillRect(-9,-8,18,16);c.fillStyle='#44755c';c.fillRect(-2,-5,4,10);c.fillRect(-6,-2,12,4);});
   for(const v of r.veins)at(v,()=>{ellipse(c,0,10,14,5,'#293b47');const a=r.sector?'#8cdada':'#f1b35e',b=r.sector?'#c2fbec':'#ffe4a0';

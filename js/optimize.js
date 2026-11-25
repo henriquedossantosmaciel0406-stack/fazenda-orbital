@@ -61,7 +61,8 @@ export function mergeGroupStatic(group, skip) {
   mesh.userData.ownedGeometry = true;
   mesh.castShadow = cast; mesh.receiveShadow = true;
   group.add(mesh);
-  addOutline(mesh);
+  // O raio da praça inteira gerava contornos maiores que os próprios ladrilhos.
+  addOutline(mesh, 0.025);
 }
 
 // Constroi (ou reaproveita do cache) uma malha fundida a partir de uma funcao que preenche um grupo temporario.

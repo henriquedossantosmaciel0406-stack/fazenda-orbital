@@ -21,7 +21,23 @@ export function openExpedition(){
       body.append(stage,canvas);
       if(performance.now()<flightUntil){
         stage.append(el('h4',null,'Em órbita de transferência'));canvas.setAttribute('aria-label','Cápsula viajando da fazenda ao asteroide');
-        const draw=()=>{const left=flightUntil-performance.now();if(left<=0){panel();return;}chart(canvas,performance.now()/1000,1-left/1800);};draw();timer=setInterval(draw,65);return;
+        const start=flightUntil-5400;
+        const draw=()=>{
+          const p=(performance.now()-start)/5400;
+          if(p>=1){panel();return;}
+          const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+          chart(canvas,performance.now()/1000,p);
+          if(p>.28&&p<.76){
+            const intensity=Math.sin((p-.28)/.48*Math.PI);
+            ctx.strokeStyle='rgba(170,245,255,'+intensity+')';
+            for(let i=0;i<48;i++){
+              const angle=i*2.4,r=(i*17+p*900)%390;
+              ctx.beginPath();ctx.moveTo(w/2+Math.cos(angle)*r,h/2+Math.sin(angle)*r*.55);
+              ctx.lineTo(w/2+Math.cos(angle)*(r+40),h/2+Math.sin(angle)*(r+40)*.55);ctx.stroke();
+            }
+          }
+          stage.firstChild.textContent=p<.28?'Decolagem da fazenda':p<.76?'Salto pelo corredor estelar':'Descida em '+sectors[run.sector].name;
+        };draw();timer=setInterval(draw,32);return;
       }
       if(!run){
         stage.append(el('h4',null,'Rotas da cápsula'));canvas.setAttribute('aria-label','Mapa orbital entre a fazenda e os asteroides');
@@ -31,7 +47,7 @@ export function openExpedition(){
           const card=el('section','route-card');card.append(el('h4',null,s.name),el('p',null,'Minere '+s.mineral.toLowerCase()+' e enfrente '+s.boss+'.'),el('small',null,s.reward+' CR · '+s.crystals+' cristais · '+s.pp+' PP'));
           card.append(button(state.level<SPACE_LEVEL?'Libera no nível '+SPACE_LEVEL:journal.completed<id?'Conclua a primeira rota':journal.completed>id?'Explorar novamente':'Lançar cápsula',()=>{
             if(state.level<SPACE_LEVEL||journal.completed<id)return;
-            journal.run=newRoom(id,0);save();flightUntil=performance.now()+1800;panel();
+            journal.run=newRoom(id,0);save();flightUntil=performance.now()+5400;panel();
           },locked));list.append(card);
         });return;
       }
@@ -59,6 +75,7 @@ export function openExpedition(){
       }
       action=name=>{
         if(modalId()!=='space'||journal.run!==run)return;
+        run.lens=!!journal.lens;
         const before=run.turn,newState=step(run,name);journal.run=newState;
         if(newState!==run||run.result){save();panel();return;}
         if(run.turn!==before){play(name==='pulse'?'click':name==='mine'?'buy':'step');save();}
@@ -69,6 +86,23 @@ export function openExpedition(){
         const b=button(label,()=>action(name));b.dataset.dir=name;b.setAttribute('aria-label',{north:'Norte',west:'Oeste',south:'Sul',east:'Leste'}[name]);pad.append(b);
       }
       const tools=el('div','pilot-tools');controls.append(tools);
+      if(run.trader){
+        const bazaar=el('section','route-card');
+        bazaar.append(el('h4',null,'Seli · coletora de Nacre'),el('p',null,'Missão de campo: traga uma opala viva até a mercadora verde. Ela fabrica uma lente permanente para o pulso da cápsula.'));
+        const barter=(cost,apply)=>{
+          if(Math.abs(run.x-run.trader.x)+Math.abs(run.y-run.trader.y)>1){run.log='Aproxime-se de Seli no mapa.';repaint();return;}
+          if(run.ore<cost){run.log='Minere uma opala viva primeiro.';repaint();return;}
+          if(run.ore+run.veins.length-cost<3){run.log='Reserve três amostras para a eclusa.';repaint();return;}
+          run.ore-=cost;apply();save();updateHUD();panel();
+        };
+        bazaar.append(button(journal.lens?'Lente prismática instalada':'1 opala → lente prismática',()=>barter(1,()=>{journal.lens=true;run.log='Missão concluída. Pulso melhorado para 5 de dano.';}),!!journal.lens));
+        bazaar.append(button('1 opala → célula de reparo',()=>barter(1,()=>{journal.cells=(journal.cells||0)+1;run.log='Célula armazenada na cápsula.';}),run.ore+run.veins.length<=3));
+        body.append(bazaar);
+      }
+      if(journal.cells>0)tools.append(button('Usar célula ('+journal.cells+')',()=>{
+        if(run.hp>=12)return;
+        journal.cells--;run.hp=Math.min(12,run.hp+6);run.log='Célula usada. Escudo reparado.';save();panel();
+      },run.hp>=12));
       tools.append(button('R · Minerar',()=>action('mine')),button('F · Pulso',()=>action('pulse')),button('E · Eclusa',()=>action('gate')));
       body.append(el('small','flight-help','WASD ou setas para mover. O pulso alcança três casas pelo corredor. Piso laranja dispara no próximo turno.'));
     }});

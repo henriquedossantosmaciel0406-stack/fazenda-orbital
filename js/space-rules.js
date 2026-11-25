@@ -8,6 +8,9 @@ export const sectors=[
    mine:['#################','#@...#...o..#...#','#.o..#..#.......#','#........##...>.#','#..#..d.....#...#','#..#..#..o..#d..#','#o....#.........#','#################'],
    vault:['#################','#@........#.....#','#...##..........#','#...........B...#','#....#..#.......#','#..+...##.......#','#...............#','#################']}
 ];
+sectors.push({name:'Nacre · Planeta das marés', mineral:'Opala viva', boss:'Leviatã de Nacre', reward:1180, crystals:22, pp:65,
+  mine:['#################','#@.A...o...#...>#','#..##......#....#','#o.....d.....o..#','#..###...##.....#','#...o.....o..d..#','#.......o.......#','#################'],
+  vault:['#################','#@..#...........#','#...#..+....B...#','#.......##......#','#.##....##....#.#','#.........d.....#','#...............#','#################']});
 const dist=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
 const directions=[[1,0],[-1,0],[0,1],[0,-1]];
 export function newRoom(sector,room,ore=0,hp=12){
@@ -15,6 +18,7 @@ export function newRoom(sector,room,ore=0,hp=12){
   const r={sector,room,ore,hp,x:1,y:1,turn:0,veins:[],enemies:[],danger:[],portal:null,kit:null,result:null,log:room?'O guardião despertou. Observe as marcas no chão.':'Analise os veios e extraia três amostras para alimentar a eclusa.'};
   layout.forEach((line,y)=>[...line].forEach((s,x)=>{
     const p={x,y};if(s==='@'){r.x=x;r.y=y;}if(s==='o')r.veins.push(p);if(s==='>')r.portal=p;if(s==='+')r.kit=p;
+    if(s==='A')r.trader=p;
     if(s==='d'||s==='B')r.enemies.push({...p,boss:s==='B',hp:s==='B'?9+sector*3:4});
   }));return r;
 }
@@ -36,7 +40,8 @@ function dangerZone(r){
   const tiles=[];
   for(let y=1;y<layout(r).length-1;y++)for(let x=1;x<layout(r)[y].length-1;x++){
     const dx=Math.abs(x-r.x),dy=Math.abs(y-r.y);
-    if(floor(r,x,y)&&(r.sector===0?dx===dy&&dx<=2:r.turn%2===0?dx===0:dy===0))tiles.push({x,y});
+    const hit=r.sector===2 ? (dx+dy===2 || dx+dy===0) : r.sector===0 ? dx===dy&&dx<=2 : r.turn%2===0?dx===0:dy===0;
+    if(floor(r,x,y)&&hit)tiles.push({x,y});
   }return tiles;
 }
 export function step(r,action){
@@ -53,7 +58,7 @@ export function step(r,action){
   }else if(action==='pulse'){
     const targets=r.enemies.map(e=>({e,path:route(r,r,e)})).filter(t=>t.path&&t.path.steps<=3).sort((a,b)=>a.path.steps-b.path.steps);
     if(!targets.length){r.log='Sem alvo a até três casas de distância pelo corredor.';return r;}
-    const e=targets[0].e;e.hp-=3;r.log='Pulso de ressonância: 3 de dano.';
+    const e=targets[0].e,damage=r.lens?5:3;e.hp-=damage;r.log='Pulso de ressonância: '+damage+' de dano.';
     if(e.hp<=0){r.enemies=r.enemies.filter(other=>other!==e);r.log='Sentinela desativada.';if(e.boss){r.result='win';r.danger=[];r.log='Guardião desativado. Carga pronta para voltar à fazenda.';return r;}}
   }else if(action==='gate'){
     if(!r.portal||dist(r,r.portal)>1||r.ore<3){r.log='A eclusa precisa de três amostras e de um piloto próximo.';return r;}

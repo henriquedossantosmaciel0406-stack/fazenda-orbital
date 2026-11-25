@@ -109,7 +109,8 @@ export function buildTown(scene,world) {
   cottage(scene,world,31,37,{w:8.3,d:5.6,h:3.43,roof:terra,shop:'Mercado',angle:Math.PI,chimney:false});
   const plaza=new THREE.Group();plaza.name='Praça do Relógio';scene.add(plaza);
   box(plaza,0xD8BB92,30,0.18,25,48,0.10,5.5);
-  box(plaza,0xD8BB92,30,0.19,25,5.6,0.10,37);
+  // Dois braços terminam na avenida, sem superfícies sobrepostas no cruzamento.
+  for (const z of [14.375,35.625]) box(plaza,0xD8BB92,30,0.18,z,5.6,0.10,15.75);
   disk(plaza,0xB88A68,30,0.26,25,5.55,0.09,32);
   disk(plaza,0xE5C79A,30,0.32,25,4.94,0.065,32);
   for(let i=0;i<16;i++){
@@ -120,11 +121,11 @@ export function buildTown(scene,world) {
   const pavers=[0x8693AA,0x72829E,0xA7B7CF];
   for(let i=0;i<30;i++)for(let j=0;j<3;j++){
     const x=7+i*1.55+(j%2)*0.63,z=25+(j-1)*1.63;
-    if(Math.hypot(x-30,z-25)>5.75)box(plaza,pavers[(i+j*2)%3],x,0.243,z,1.43,0.045,1.49);
+    if(Math.hypot(x-30,z-25)>5.75)box(plaza,pavers[(i+j*2)%3],x,0.27,z,1.43,0.045,1.49);
   }
   for(let i=0;i<15;i++)for(let j=0;j<3;j++){
     const z=13+i*1.67+(j%2)*0.64,x=30+(j-1)*1.58;
-    if(Math.hypot(x-30,z-25)>5.75)box(plaza,pavers[(i+j)%3],x,0.247,z,1.44,0.045,1.53);
+    if(Math.hypot(x-30,z-25)>5.75)box(plaza,pavers[(i+j)%3],x,0.27,z,1.44,0.045,1.53);
   }
   // Fonte armilar com planetas em órbita. A borda deixa espaço para circular.
   disk(plaza,0xAD9170,30,.51,25,2.05,.35,24);
