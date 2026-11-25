@@ -17,7 +17,16 @@ import { setOutlines } from './toon.js';
 
 const canvas = document.getElementById('game');
 const dprNative = devicePixelRatio || 1;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: dprNative < 2, powerPreference: 'high-performance' });
+const session = await showLogin();
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({canvas,antialias:dprNative<2,powerPreference:'high-performance'});
+} catch (error) {
+  const notice=document.getElementById('graphicsNotice');
+  notice.hidden=false;
+  notice.querySelector('button').onclick=()=>location.reload();
+  throw error;
+}
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false; // atualizado manualmente a cada 3 quadros
@@ -28,7 +37,6 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 700);
 
 // Login/cadastro antes de tudo: cada conta tem o proprio save
-const session = await showLogin();
 setSaveKey(saveKeyFor(session.nick));
 const hasSave = load(); // o save e lido ANTES de criar o jogo, para restaurar canteiros sem duplicar
 if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS));

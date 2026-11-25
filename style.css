@@ -366,3 +366,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #ffca67;outline-offse
 #modal .menu-list button:only-child{grid-column:1/-1}
 @media(max-width:500px){.colony-view{height:102px;min-height:0}#modal .menu-list{gap:7px}.inventory-cards{grid-template-columns:repeat(auto-fit,minmax(115px,1fr))}#hud .top-right{max-width:42vw}}
 @media(max-height:500px){.colony-view{height:68px;min-height:0}.colony-view h1{font-size:24px}#menu .menu-card,#login .menu-card{padding-bottom:10px}}
+
+.colony-view{background-size:cover;background-position:center 61%;image-rendering:pixelated}
+#graphicsNotice{position:absolute;z-index:30;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff1d8;background:#24364a}
+#graphicsNotice[hidden]{display:none}
