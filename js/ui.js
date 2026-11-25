@@ -4,7 +4,7 @@ import {PETS} from './actors.js';
 import {CANS,canLevel} from './gear.js';
 // Interface: HUD, notificacoes, janelas (modais), menus, configuracoes, conquistas e estatisticas.
 import { register, login, lastNick, autoLogin, setRemember } from './accounts.js';
-import { state, bus, HOTBAR, reputation, stockLimit, stockUsed, maxEnergy, waterCap, save, clearSave } from './state.js';
+import { state, walletLabel, bus, HOTBAR, reputation, stockLimit, stockUsed, maxEnergy, waterCap, save, clearSave } from './state.js';
 import { CONFIG } from './config.js';
 import { applyVolumes, play, initAudio } from './audio.js';
 
@@ -159,7 +159,7 @@ export function updateHUD() {
   const isDay = hour >= 6 && hour < 18;
   setText('clock', 'Dia ' + state.day + ' - ' + String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0') + (isDay ? '' : ' (noite)'));
   setText('zone', (state.zone || 'FAZENDA').toLowerCase());
-  setText('money', Math.floor(state.money));
+  setText('money', walletLabel());
   const cap = waterCap();
   setText('water', Math.floor(state.water) + ' / ' + cap);
   $('waterFill').style.width = Math.min(100, state.water / state.maxWater * 100) + '%';
@@ -325,7 +325,7 @@ export function openShop(title, buildTabs) {
     id: 'shop', title, wide: true, hint: 'Pressione E ou ESC para fechar',
     build(body) {
       const summary=el('div','wallet-line');
-      summary.append(el('strong',null,Math.floor(state.money)+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
+      summary.append(el('strong',null,walletLabel()+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
       const tabs = buildTabs();
       const { box, index } = makeTabs(body, tabs.map(t => t.name));
       const list = el('div', 'list');
@@ -342,7 +342,7 @@ export function toggleInventory() {
   openModal({
     id:'inventory',title:'Mochila',wide:true,hint:'I ou Esc para fechar',
     build(body){
-      const summary=el('div','wallet-line');summary.append(el('strong',null,Math.floor(state.money)+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
+      const summary=el('div','wallet-line');summary.append(el('strong',null,walletLabel()+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
       const {box,index}=makeTabs(body,['Plantio','Colheitas','Equipamento','Pets']);
       const grid=el('div','inventory-cards');box.append(grid);
       const card=(key,title,value,action)=>{
@@ -500,7 +500,7 @@ export async function showLogin() {
       $('recoveryNotice').hidden=false;
       $('recoveryDismiss').onclick=()=>{$('recoveryNotice').hidden=true;$('recoveryCode').textContent='';};
     }
-    return {nick:r.nick,imported:!!r.imported};
+    return {nick:r.nick,orbitalPass:r.orbitalPass===true,imported:!!r.imported};
   };
   if(!location.search.includes('relogin')){
     const auto=hosted?await api('session'):autoLogin();

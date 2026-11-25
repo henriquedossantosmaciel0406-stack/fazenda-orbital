@@ -2,6 +2,9 @@
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { createPlayer } from './player.js';
+import {enableOrbitalPass} from './state.js';
+import {PETS} from './actors.js';
+import {sectors} from './space-rules.js';
 import { initGame, updateGame } from './game.js';
 import { state, load, save, setSaveKey } from './state.js';
 import { saveKeyFor } from './accounts.js';
@@ -29,6 +32,7 @@ const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 70
 const session = await showLogin();
 setSaveKey(saveKeyFor(session.nick));
 const hasSave = load(); // o save e lido ANTES de criar o jogo, para restaurar canteiros sem duplicar
+if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS), sectors.length);
 const world = createWorld(scene);
 
 // Congela as matrizes do cenario fixo: o Three.js deixa de recalcula-las a cada quadro.

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {geo,mat,makeLabel} from './world.js';
 
-const plaster=0xF6DBA2, wood=0x664738, beam=0x9B7151, trim=0xFFF0CB;
-const glass=0x3F7881, slate=0x316D72, honey=0xDFA94F, terra=0xBF6949;
+const plaster=0xD1D5E9, wood=0x333754, beam=0x656888, trim=0xACFFEB;
+const glass=0x569ABB, slate=0x465DAC, honey=0xDFA94F, terra=0xBF6949;
 const box=(g,c,x,y,z,w,h,d)=>part(g,geo('box',w,h,d),c,x,y,z);
 function part(g,shape,color,x,y,z){
   const m=new THREE.Mesh(shape,mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;
@@ -55,11 +55,21 @@ function cottage(scene,world,x,z,{w,d,h,roof,wall=plaster,angle=0,shop,chimney=t
   box(g,wall,0,h/2+0.40,0,w,h,d);
   for(const sx of [-1,1])for(const sz of [-1,1])box(g,beam,sx*(w/2-0.06),h/2+0.42,sz*(d/2-0.06),0.21,h+0.1,0.22);
   box(g,beam,0,h+0.36,0,w+0.15,0.21,d+0.12);
-  gabledRoof(g,w,d,h+0.43,w*0.31,roof);
+  box(g,beam,0,h+.48,0,w+.4,.28,d+.4);
+  orb(g,glass,0,h+.56,0,w*.49,w*.30,d*.48);
+  for(const side of [-1,1]){
+    const panel=box(g,slate,side*w*.38,h+w*.16+.52,0,w*.30,.15,d*.78);
+    panel.rotation.z=-side*.35;
+    for(const z of [-.24,0,.24])box(g,trim,side*w*.38,h+w*.16+.62,z*d,w*.30,.06,.09).rotation.z=panel.rotation.z;
+  }
   const loftY=h+0.48+w*0.091;
   const frame=disk(g,wood,0,loftY,front+0.09,0.38,0.17,14);frame.rotation.x=Math.PI/2;
   disk(g,glass,0,loftY,front+0.19,0.27,0.055,14).rotation.x=Math.PI/2;
-  if(chimney){box(g,0xB37659,-w*0.26,h+1.10,-d*0.23,0.59,1.52,0.65);box(g,trim,-w*0.26,h+1.91,-d*0.23,0.74,0.15,0.78);}
+  if(chimney){
+    disk(g,beam,-w*.30,h+1.7,-d*.22,.10,2.4,8);
+    orb(g,trim,-w*.30,h+2.88,-d*.22,.85,.19,.85).rotation.z=.52;
+    orb(g,honey,-w*.30-.17,h+3.15,-d*.22,.12,.12,.12);
+  }
   const doorX=shop?-w*0.33:0;
   box(g,wood,doorX,1.45,front+0.065,1.33,2.19,0.16);
   box(g,shop?slate:roof,doorX,1.43,front+0.16,1.06,1.98,0.12);
@@ -107,7 +117,7 @@ export function buildTown(scene,world) {
     box(plaza,trim,30+Math.sin(a)*5.18,0.32,25+Math.cos(a)*5.18,0.55,0.07,0.19).rotation.y=a;
   }
   // Paralelepípedos claros desenham o caminho dos portões sem cobrir a mandala.
-  const pavers=[0xE6CFA7,0xCDB38A,0xEAD7B2];
+  const pavers=[0x8693AA,0x72829E,0xA7B7CF];
   for(let i=0;i<30;i++)for(let j=0;j<3;j++){
     const x=7+i*1.55+(j%2)*0.63,z=25+(j-1)*1.63;
     if(Math.hypot(x-30,z-25)>5.75)box(plaza,pavers[(i+j*2)%3],x,0.243,z,1.43,0.045,1.49);

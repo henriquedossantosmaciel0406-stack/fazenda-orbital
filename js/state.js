@@ -57,12 +57,31 @@ export const state = {
 };
 
 // ---------- Derivados ----------
+let special = false;
+export function enableOrbitalPass(pets, sectorCount) {
+  if (special) return;
+  special = true;
+  state.level = Math.max(100, state.level);
+  state.islandUnlocked = true;
+  state.adoptedPets = [...pets];
+  state.expedition.completed = sectorCount;
+  state.maxWater = Math.max(50,state.maxWater);
+  state.water = state.maxWater;
+  state.crystals = Math.max(9999,state.crystals);
+  for (const id of Object.keys(CONFIG.research)) state.research[id] = true;
+  for (const [id,def] of Object.entries(CONFIG.land)) state.land[id] = def.max;
+  for (const bag of [state.seeds,state.saplings])
+    for (const id of Object.keys(bag)) bag[id] = Math.max(99,bag[id]);
+  Object.defineProperty(state,'money',{get:()=>Number.MAX_SAFE_INTEGER,set(){}});
+}
+export const walletLabel = () => special ? '∞' : Math.floor(state.money);
 export const hasResearch = id => !!state.research[id];
 export const structuresOf = type => state.structures.filter(s => s.type === type);
 export const hasBuilding = type => structuresOf(type).length > 0;
 export const buildingLevel = type => structuresOf(type).reduce((m, s) => Math.max(m, s.level), 0);
 
 export function reputation() {
+  if (special) return 999;
   let r = 0;
   for (const s of state.structures) r += CONFIG.structures[s.type].rep * (1 + 0.3 * (s.level - 1));
   r += state.stats.contracts * 1.5;
@@ -104,6 +123,8 @@ export function addMoney(n) {
   if (n > 0) { state.stats.earned += n; bus.emit('earn', n); }
 }
 export function addXp(amount) {
+  if (special) return;
+  if (special) return;
   state.xp += amount;
   while (state.xp >= state.xpNeeded) {
     state.xp -= state.xpNeeded;

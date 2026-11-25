@@ -34,7 +34,7 @@ async function issue(req,res,a,remember){
   cookie(req,res,a.nick+'.'+token,remember?days*86400:null);
 }
 const validSave=s=>s&&typeof s==='object'&&Array.isArray(s.plots)&&Number.isFinite(s.level);
-const view=a=>({ok:true,nick:a.nick,save:a.save,revision:a.revision});
+const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',save:a.save,revision:a.revision});
 module.exports=async function api(req,res,route,attempt=0){
   const send=(status,data)=>res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data));
   try{
@@ -48,6 +48,7 @@ module.exports=async function api(req,res,route,attempt=0){
       if(!/^[A-Za-z0-9_-]{3,16}$/.test(nick)||typeof pass!=='string'||pass.length<4||pass.length>128)throw fail(400,'Use um nick de 3 a 16 caracteres e uma senha de 4 a 128.');
       let a=await read(nick),recovery;
       if(route==='register'){
+        if(nick.toLowerCase()==='rick')throw fail(409,'Este nome é reservado.');
         if(a)throw fail(409,'Nick já cadastrado neste servidor.');
         const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
         recovery=crypto.randomBytes(16).toString('hex');
