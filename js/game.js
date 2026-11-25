@@ -892,7 +892,7 @@ function openMarket() {
     let total = 0;
     entries.forEach(([kind, key]) => { total += itemPrice(kind, key) * haveOf(kind, key); });
     items.push(row({
-      title: 'Vender tudo', desc: entries.length ? 'Vende todos os itens do estoque de uma vez.' : 'Voce nao tem nada para vender. Colha plantas e frutos!',
+      title: 'Caixa da colheita', desc: entries.length ? 'Venda o estoque inteiro em uma troca.' : 'Estoque vazio. Colha plantas ou frutos para vender aqui.',
       tag: total + ' CR', tagCls: 'gold',
       bar: { frac: Math.min(1, entries.length ? 1 : 0), cls: 'gold', text: entries.length + ' tipos de item' },
       buttons: [{ label: 'Vender tudo', disabled: !entries.length, onClick: () => sellEverything() }]
@@ -905,8 +905,8 @@ function openMarket() {
       else if (kind === 'mut') { color = CONFIG.mutations[key.split(':')[0]].color; extra = 'MUTANTE'; }
       else if (kind === 'crystal') color = 0x59E6FF;
       items.push({
-        thumb:kind==='mut'?key.split(':')[1]:kind==='crystal'?'crystal':key,title: itemName(kind, key), color, desc: 'Preco ' + price + ' CR cada  |  Bonus de reputacao +' + Math.round((priceBonus() - 1) * 100) + '%',
-        tag: extra || 'Voce tem ' + count, tagCls: extra ? 'gold' : '',
+        thumb:kind==='mut'?key.split(':')[1]:kind==='crystal'?'crystal':key,title: itemName(kind, key), color, desc: price + ' CR por unidade · '+count+' em estoque',
+        tag: extra || 'Reputação +' + Math.round((priceBonus() - 1) * 100) + '%', tagCls: extra ? 'gold' : '',
         buttons: [
           { label: 'Vender 1', onClick: () => sellItem(kind, key, 1) },
           { label: 'Vender tudo (' + (price * count) + ' CR)', onClick: () => sellItem(kind, key, count) }

@@ -370,3 +370,86 @@ button:focus-visible,input:focus-visible{outline:3px solid #ffca67;outline-offse
 .colony-view{background-size:cover;background-position:center 61%;image-rendering:pixelated}
 #graphicsNotice{position:absolute;z-index:30;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff1d8;background:#24364a}
 #graphicsNotice[hidden]{display:none}
+
+/* Balcões da colônia. A vitrine é desenhada sobre a cena 3D. */
+#modal[data-view="shop"].wide {
+  --ink-shop:#233341; --wood:#784832; --trim:#a6dc9b; --awning:#368375;
+  --shade:#245f57; --paper:#fff4cf; width:min(948px,95vw);
+  border:4px solid var(--ink-shop); border-radius:2px; background:#e5ce99;
+  box-shadow:0 0 0 3px #aa8060,0 7px 0 3px #322c32,0 16px 45px #10182780;
+}
+#modal[data-view="shop"][data-market="true"] {
+  --trim:#ffd791; --awning:#bf6348; --shade:#854531;
+}
+#modal[data-view="shop"] .modal-head {
+  position:relative; isolation:isolate; margin:0; padding:23px 18px 12px;
+  background:var(--shade); border:0; border-bottom:4px solid var(--ink-shop);
+}
+#modal[data-view="shop"] .modal-head::before {
+  content:""; position:absolute; inset:0 0 auto; height:11px;
+  background:repeating-linear-gradient(90deg,var(--awning) 0 20px,var(--trim) 20px 40px);
+  border-bottom:3px solid #20303b;
+}
+#modal[data-view="shop"] .modal-head h3 {
+  color:#fff3ca; font:bold clamp(21px,3vw,30px)/1.15 monospace;
+  text-shadow:2px 3px #263039; letter-spacing:-.05em;
+}
+#modal[data-view="shop"] #modalClose {
+  border:2px solid #29343d; border-radius:0; background:#feedbc; color:#38332d;
+  min-height:38px; box-shadow:inset 0 -3px #d4b586,2px 2px #25323b;
+}
+#modal[data-view="shop"] #modalBody {padding:0; scrollbar-color:#ab7652 #eddcb7}
+.stall-counter {
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 16px;
+  padding:8px 15px; background:#344758; color:#ffedc3; border-bottom:3px solid #233341;
+}
+.stall-counter>div {display:flex;gap:9px;align-items:center}
+.stall-counter span {font:bold 12px monospace;color:#dbe6da}
+.stall-counter strong {font:bold 15px monospace}
+.stall-balance::before {content:"";width:10px;height:12px;background:#ffda60;box-shadow:inset -3px 0 #db943e,inset 2px 0 #fff2ae,0 2px #92634a}
+.stall-stock::before {content:"";width:12px;height:10px;border:2px solid #daaa6e;background:repeating-linear-gradient(0deg,#915d40 0 3px,#cb9665 3px 5px)}
+.stall-shelves {display:grid;grid-template-columns:148px minmax(0,1fr);align-items:start}
+#modal[data-view="shop"] .stall-shelves>.tabs {
+  display:grid; gap:5px; align-content:start; margin:0; padding:12px 7px;
+  background:#cba976; border-right:3px solid #986d50;align-self:stretch;
+}
+#modal[data-view="shop"] .tabs .tab {
+  margin:0;text-align:left;min-height:42px;padding:6px 9px;border:2px solid #8c704f;
+  background:#f6e1ad;color:#3e3d39;border-radius:0;box-shadow:inset 0 -3px #debf89;
+}
+#modal[data-view="shop"] .tabs .tab.active {background:var(--shade);color:#fff6dc;border-color:var(--ink-shop);box-shadow:inset 4px 0 var(--trim);padding-left:12px}
+.stall-shelves>.tab-body {min-width:0;padding:12px;background:repeating-linear-gradient(0deg,#e6cea4 0 23px,#dfc499 23px 25px)}
+#modal[data-view="shop"] .stall-shelves .list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px}
+#modal[data-view="shop"] .list>div:not(.shop-item),#modal[data-view="shop"][data-market="true"] .tab-body>.list>.shop-item:first-child {grid-column:1/-1}
+#modal[data-view="shop"] .shop-item,#modal[data-view="shop"] .shop-item.seed-packet {
+  min-width:0; height:100%; align-content:start;align-items:start;grid-template-columns:auto minmax(0,1fr);
+  border:2px solid #685846;border-radius:0;background:var(--paper);box-shadow:0 4px #ac8057;
+  padding:10px;gap:8px; color:#2c3e3c;
+}
+#modal[data-view="shop"] .product-image,#modal[data-view="shop"] .seed-packet .product-image {
+  display:grid;place-items:center;width:56px;height:56px;padding:0;border:2px solid #8d967b;border-radius:0;
+  background:repeating-conic-gradient(#e8eac5 0 25%,#dbe2b9 0 50%) 0 0/12px 12px;
+}
+#modal[data-view="shop"] .product-image img {width:48px;height:48px;image-rendering:pixelated}
+#modal[data-view="shop"] .info .head {align-items:start;gap:4px 6px}
+#modal[data-view="shop"] .badge {border-radius:0;color:#384a3b;background:#e0e8bc}
+#modal[data-view="shop"] .badge.bad {color:#713f36;background:#f1d0af}
+#modal[data-view="shop"] .badge.gold {color:#674818;background:#ffdc88}
+#modal[data-view="shop"] .shop-item .btns {flex-direction:row;align-self:end;margin-top:auto;justify-content:start}
+#modal[data-view="shop"] .shop-item button {white-space:normal;min-height:40px;border-radius:0;border:2px solid var(--ink-shop);background:var(--shade);box-shadow:inset 0 2px var(--awning),0 2px var(--ink-shop);color:#fff8de}
+#modal[data-view="shop"] .shop-item button:disabled {background:#e1d6bb;color:#655c51;opacity:1;border-color:#a49780;box-shadow:none}
+#modal[data-view="shop"] .section,#modal[data-view="shop"] .hint {color:#46382e}
+#modal[data-view="shop"] #modalHint {margin:0;padding:6px 12px;background:#f5dfac;border-top:3px solid #957252}
+@media(max-width:650px) {
+  .stall-shelves {display:block}
+  #modal[data-view="shop"] .stall-shelves>.tabs {display:flex;flex-wrap:wrap;padding:6px;gap:4px;border-right:0;border-bottom:2px solid #977457}
+  #modal[data-view="shop"] .tabs .tab {min-height:36px;padding:4px 8px;font-size:12px}
+  #modal[data-view="shop"] .stall-shelves .list {grid-template-columns:1fr}
+  .stall-shelves>.tab-body {padding:9px}
+}
+
+#modal[data-view="shop"] .modal-head h3::before{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABHUlEQVR4nGNgGOmAkVoGHf/U8x9dzJKvhKD5LJRanDEnGcNiUgDRDphwOA/DogLbSRSHIMUhAAMLV11H4c9ImUuU4yhygLqp+//9M58w3Dy9k2ppiWQHqJu6U5QGmKjlmCHrAKxxR2mw4gLY0greRNizoZoqFpcEtOKUG/AoQAkBWNCb5vpQ1RK4eZMZ/jMwoEYFwXIAX/ARAwhFI94oWLn3IkWWEwOILglzTs2Hs6eYJZKtBh0MeCIccAfgjYJwZ32G05O3MDAwEBekxAY7QQfALA131ifZQHzmEe0AZECt0pAoB8AKCHx1AaGsiS/USK4LSLWAHDC4cwG2YpiYegJfoiPKAehxRW77gJi2IslpgBTfEQMGPA2MggEHAK5vVE+2fBjeAAAAAElFTkSuQmCC)}
+#modal[data-view="shop"][data-market="true"] .modal-head h3::before{background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABDUlEQVR4nGNgGAWjYIABIzGK1E3d/5Nrwc3TO/HawUKKYfsjpIlW67jiKVHqmEhxAC3AgDsAa/ygx/mNtdEUWaIRvBTORk8TRKUBZAOoDQY8CvCGwNl5AVSxxDhpAwMDA/YsieIAWNwvDRSgisUwADMvmgFiPrJDCKYBmOvJBYRCEW8auLH5AEWWEwOILglv9OrD2RrFF8lWgw4GPBcMuAPwRoGGrwMDw/oNEDYRQUpssBN0QPT6DwwMDAwMZ31JNg8rgJlHtAOQAbUKI6IcACsg8DVACGVNDV8HnHIES0JiAD4LyAGDOxdgK4aJqSfwJTqiHIAeV+Q2Sgk1SHE6AB8gxXfEgAFPA6NgwAEAnNJKJt5vgSkAAAAASUVORK5CYII=)}
+#modal[data-view="shop"] .modal-head h3{display:flex;align-items:center;gap:8px}
+#modal[data-view="shop"] .modal-head h3::before{content:"";width:42px;height:42px;background-size:cover;image-rendering:pixelated;background-color:#253c48;border:2px solid #1e313d;box-shadow:2px 2px #1e313d;flex:none}
+#modal[data-view="shop"] .tabs {border-radius:0}

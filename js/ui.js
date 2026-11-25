@@ -268,7 +268,16 @@ export function makeTabs(body, names) {
   names.forEach((n, i) => {
     const b = el('button', 'tab' + (i === idx ? ' active' : ''), n);
     b.type = 'button';
-    b.addEventListener('click', () => { modal.tab = i; play('click'); refreshModal(); });
+    b.setAttribute('aria-pressed', String(i === idx));
+    b.addEventListener('click', () => {
+      modal.tab = i;
+      play('click');
+      if(modal.id!=='shop'){refreshModal();return;}
+      renderModal(0);
+      const selected = $('modalBody').querySelector('.tabs .active');
+      selected?.focus({preventScroll:true});
+      selected?.scrollIntoView({block:'nearest',inline:'nearest'});
+    });
     bar.append(b);
   });
   const box = el('div', 'tab-body');
@@ -330,17 +339,51 @@ export function showResume(v) {
 export const isResumeVisible = () => resumeVisible;
 
 // ---------- Loja generica com abas ----------
+// Desenha miniaturas em uma grade de pixels e reutiliza o resultado a cada compra.
+const stallSprites=new Map();
+function pixelateProducts(list) {
+  for(const img of list.querySelectorAll('.product-image img')){
+    const src=img.src;
+    const replace=()=>{
+      let sprite=stallSprites.get(src);
+      if(!sprite){
+        const canvas=document.createElement('canvas');
+        canvas.width=32; canvas.height=32;
+        const ctx=canvas.getContext('2d');
+        if(!ctx || !img.naturalWidth)return;
+        const scale=32/Math.max(img.naturalWidth,img.naturalHeight);
+        const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);
+        ctx.drawImage(img,(32-w)>>1,(32-h)>>1,w,h);
+        sprite=canvas.toDataURL();
+        stallSprites.set(src,sprite);
+      }
+      img.src=sprite;
+    };
+    if(stallSprites.has(src))img.src=stallSprites.get(src);
+    else if(img.complete && img.naturalWidth)replace();
+    else img.addEventListener('load',replace,{once:true});
+  }
+}
+
 export function openShop(title, buildTabs) {
   openModal({
-    id: 'shop', title, wide: true, hint: 'Pressione E ou ESC para fechar',
+    id:'shop',title,wide:true,
+    hint:document.body.classList.contains('touch')?'Toque em Fechar para voltar à fazenda.':'E ou Esc para voltar à fazenda.',
     build(body) {
-      const summary=el('div','wallet-line');
-      summary.append(el('strong',null,walletLabel()+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
-      const tabs = buildTabs();
-      const { box, index } = makeTabs(body, tabs.map(t => t.name));
-      const list = el('div', 'list');
-      tabs[index].items.forEach(it => list.append(it instanceof HTMLElement ? it : row(it)));
+      const summary=el('div','stall-counter');
+      const balance=el('div','stall-balance');
+      balance.append(el('span',null,'Carteira'),el('strong',null,walletLabel()+' CR'));
+      const stock=el('div','stall-stock');
+      stock.append(el('span',null,'Estoque'),el('strong',null,stockUsed()+' / '+stockLimit()));
+      summary.append(balance,stock);
+      const shelves=el('div','stall-shelves');
+      body.append(summary,shelves);
+      const tabs=buildTabs();
+      const {box,index}=makeTabs(shelves,tabs.map(t=>t.name));
+      const list=el('div','list');
+      tabs[index].items.forEach(it=>list.append(it instanceof HTMLElement?it:row(it)));
       box.append(list);
+      pixelateProducts(list);
     }
   });
 }
