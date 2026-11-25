@@ -666,16 +666,21 @@ export function updateNet(dt) {
     camera.getWorldDirection(tmpDir);
     const r = Math.atan2(-tmpDir.x, -tmpDir.z);
     const jump=+Math.max(0,camera.position.y-CONFIG.player.height).toFixed(2);
-    send({ t: 'pos', jump,pet:state.activePet, id: N.myId, farm, x: +x.toFixed(2), z: +z.toFixed(2), r });
-    const moved = x !== N.last.x || z !== N.last.z || r !== N.last.r || jump!==N.last.jump;
-    N.last = {x, z, r,jump}; N.tPos = play_ && moved ? 0.1 : 0.25;
+    x=+x.toFixed(2);z=+z.toFixed(2);
+    const yaw=+r.toFixed(3),pet=state.activePet;
+    const moved=x!==N.last.x||z!==N.last.z||yaw!==N.last.r||jump!==N.last.jump||farm!==N.last.farm||pet!==N.last.pet;
+    if(moved || N.clock-(N.last.sent??-Infinity)>=1){
+      send({t:'pos',jump,pet,id:N.myId,farm,x,z,r:yaw});
+      N.last={x,z,r:yaw,jump,farm,pet,sent:N.clock};
+    }
+    N.tPos=play_?0.07:0.25;
   }
   N.tFarm -= dt;
   if (N.tFarm <= 0) { N.tFarm = 2; sendFarm(); }
   N.tSync -= dt;
   if (N.tSync <= 0 && N.mode === 'host') { N.tSync = 1; sendSync(); }
   // avatares suaves + etiquetas sempre de frente + estruturas animadas
-  const k = 1 - Math.exp(-dt * 10);
+  const k = 1 - Math.exp(-dt * 17);
   for (const r of N.remotes.values()) {
     if (r.pos.distanceToSquared(r.target) > 900) r.pos.copy(r.target); else r.pos.lerp(r.target, k);
     r.avatar.position.copy(r.pos);
@@ -684,7 +689,8 @@ export function updateNet(dt) {
     r.walk = THREE.MathUtils.lerp(r.walk || 0, sp > 0.05 ? 1 : 0, k);
     animateFarmer(r.avatar,N.clock,r.walk,r.pos.y);
     r.pet.update(r.petType,r.pos,dt,N.clock,world);
-    r.avatar.rotation.y = r.yaw + Math.PI;
+    const turn=r.yaw+Math.PI-r.avatar.rotation.y;
+    r.avatar.rotation.y+=Math.atan2(Math.sin(turn),Math.cos(turn))*k;
 
     if (r.farm.root.visible) for (const g of r.farm.structs.values()) animateStructure(g, N.clock, dt);
 

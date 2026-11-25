@@ -11,8 +11,12 @@ export async function connectHttpRoom(op,code,handlers){
   const {id,token,size}=await request({op});
   let active=true,timer,seq=1,after=0,pending=null,failures=0,alone=size===1;
   const queue=[];
-  let inFlight=false;
-  function schedule(ms){clearTimeout(timer);if(active&&!inFlight)timer=setTimeout(poll,ms);}
+  let inFlight=false, due=Infinity, retrying=false;
+  function schedule(ms){
+    const deadline=performance.now()+ms;
+    if(!active || inFlight || deadline>=due)return;
+    clearTimeout(timer);due=deadline;timer=setTimeout(poll,ms);
+  }
   function enqueue(packet){
     if(!active)return;
     const m=packet.msg;
@@ -21,7 +25,7 @@ export async function connectHttpRoom(op,code,handlers){
       if(i!==-1)queue.splice(i,1);
     }
     queue.push(packet);
-    if(!['pos','sync','farm'].includes(m.t))schedule(5);
+    if(!retrying && (!['pos','sync','farm'].includes(m.t) || (m.t==='pos' && !alone)))schedule(12);
   }
   function stop(){
     if(!active)return;
@@ -32,7 +36,7 @@ export async function connectHttpRoom(op,code,handlers){
   }
   async function poll(){
     if(!active||inFlight)return;
-    inFlight=true;let delay;
+    due=Infinity;inFlight=true;let delay;
     try{
       if(!pending){
         let n=0;pending=[];
@@ -40,18 +44,19 @@ export async function connectHttpRoom(op,code,handlers){
       }
       const reply=await request({op:'poll',id,token,seq,after,packets:pending});
       if(!active)return;
-      seq++;pending=null;failures=0;alone=reply.size===1;
+      seq++;pending=null;failures=0;retrying=false;alone=reply.size===1;
       for(const event of reply.events){
         if(!active)break;
         after=event.cursor;if(event.gone)handlers.onGone(event.from);else handlers.onMsg(event.from,event.msg);
       }
-      delay=reply.events.length>=64||queue.some(p=>!['pos','farm','sync'].includes(p.msg.t))?5:alone?900:235;
+      const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
+      delay=reply.events.length>=64||(!alone&&urgent)?12:alone?650:130;
     }catch(e){
       if(!active)return;
       if((e.status>=400&&e.status<500&&e.status!==429)||++failures>=7){
         close();handlers.onGone();return;
       }
-      delay=Math.min(2500,250*2**failures);
+      retrying=true;delay=Math.min(2500,250*2**failures);
     }finally{inFlight=false;if(active)schedule(delay||235);}
   }
   addEventListener('pagehide',close);schedule(10);

@@ -23,7 +23,16 @@ export function makeFarmer(seed) {
   const root=new THREE.Group(),rig=pivot(root,0,0,0), torso=pivot(rig,0,0,0);
   const cloth=shirts[seed%shirts.length],skin=skins[seed%skins.length],hair=[0x4B352E,0x764732,0x302A2C][seed%3];
   const denim=0x304E68, honey=0xEDC47C, arms=[],legs=[];
-  oval(torso,cloth,0,0.76,0,0.28,0.32,0.195);
+  // Macacão pressurizado e mochila de cultivo, visíveis de frente e de costas.
+  oval(torso,cream,0,0.76,0,0.30,0.32,0.21);
+  piece(torso,geo('box',.39,.40,.18),denim,0,.77,-.21);
+  piece(torso,geo('box',.26,.23,.05),cloth,0,.78,-.31);
+  for(const side of [-1,1]){
+    oval(torso,0x76DECE,side*.22,.76,-.21,.068,.18,.075);
+    oval(torso,cloth,side*.245,.93,0,.14,.11,.145);
+  }
+  oval(torso,0x91BC64,.075,1.03,-.21,.045,.115,.03).rotation.z=-.55;
+  oval(torso,0xACD878,-.045,1.01,-.21,.04,.09,.03).rotation.z=.65;
   piece(torso,geo('box',0.42,0.29,0.16),denim,0,0.65,0.12);
   piece(torso,geo('box',0.18,0.12,0.035),0x507490,0,0.67,0.21);
   for(const side of [-1,1]) {
@@ -31,7 +40,8 @@ export function makeFarmer(seed) {
     oval(torso,honey,side*0.14,0.78,0.193,0.026,0.026,0.015);
     const arm=pivot(rig,side*0.26,0.90,0);
     oval(arm,cloth,side*0.035,-0.09,0,0.115,0.15,0.119);
-    oval(arm,skin,side*0.045,-0.247,0.013,0.077,0.118,0.083);
+    oval(arm,cream,side*0.045,-0.24,0.013,0.084,0.12,0.085);
+    oval(arm,denim,side*.045,-.31,.025,.085,.075,.092);
     const leg=pivot(rig,side*0.125,0.53,0);
     oval(leg,denim,0,-0.155,0,0.118,0.19,0.132);
     oval(leg,0x715241,0,-0.382,0.045,0.124,0.137,0.173);
@@ -47,16 +57,21 @@ export function makeFarmer(seed) {
   }
   eyes(head,0.036,0.266,0.126,0.058);oval(head,skin,0,-0.032,0.307,0.059,0.05,0.05);
   const smile=piece(head,geo('tor',0.052,0.008,5,10,Math.PI),0x794936,0,-0.099,0.274);smile.rotation.z=Math.PI;
-  for(let i=0;i<7;i++){const a=i*0.65+1.24;oval(head,hair,Math.sin(a)*0.266,0.09,Math.cos(a)*0.23,0.075,0.12,0.085);}
-  for(let i=0;i<3;i++)oval(head,hair,-0.19+i*0.1,0.162+i*0.013,0.21,0.090,0.085,0.080);
-  if(seed%3===1){
-    oval(head,cloth,0,0.238,-0.02,0.335,0.19,0.29);
-    oval(head,denim,0,0.214,0.205,0.27,0.034,0.195);
+  // Capacete aberto: a face continua legível mesmo em telas pequenas.
+  oval(head,cream,0,.06,-.075,.362,.345,.267);
+  oval(head,cloth,0,.245,.04,.36,.14,.30);
+  piece(head,geo('box',.37,.058,.14),denim,0,.22,.26);
+  for(const side of [-1,1]){
+    const earpiece=piece(head,geo('cyl',.105,.105,.077,12),cloth,side*.346,.025,-.015);
+    earpiece.rotation.z=Math.PI/2;
+  }
+  if(seed%3===0){
+    piece(head,geo('cyl',.017,.023,.17,8),denim,.26,.34,0);
+    oval(head,0x94EFE3,.26,.44,0,.045,.046,.045);
+  }else if(seed%3===1){
+    oval(head,honey,0,.255,.263,.082,.065,.037);
   }else{
-    piece(head,geo('cyl',0.43,0.45,0.044,16),honey,0,0.215,0).scale.z=0.93;
-    piece(head,geo('cyl',0.22,0.29,0.205,14),honey,0,0.334,-0.015);
-    piece(head,geo('cyl',0.281,0.292,0.050,14),cloth,0,0.261,-0.015);
-    const feather=oval(head,0x8DA85D,0.262,0.387,0.025,0.042,0.128,0.023);feather.rotation.z=-0.5;
+    for(const side of [-1,1])oval(head,0xA1DB78,side*.055,.385,-.035,.037,.094,.028).rotation.z=-side*.48;
   }
   batch(head);batch(torso);root.userData.pose={rig,head,legs,arms};return root;
 }
