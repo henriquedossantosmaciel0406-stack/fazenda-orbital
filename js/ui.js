@@ -1,3 +1,7 @@
+import {hosted,api,enterCloud,settle} from './cloud.js';
+import {saveKeyFor} from './accounts.js';
+import {PETS} from './actors.js';
+import {CANS,canLevel} from './gear.js';
 // Interface: HUD, notificacoes, janelas (modais), menus, configuracoes, conquistas e estatisticas.
 import { register, login, lastNick, autoLogin, setRemember } from './accounts.js';
 import { state, bus, HOTBAR, reputation, stockLimit, stockUsed, maxEnergy, waterCap, save, clearSave } from './state.js';
@@ -97,7 +101,7 @@ export function setBuildHint(text) {
 // ---------- HUD ----------
 let hotbarBuilt = false;
 function slotLabel(slot) {
-  return slot.type === 'can' ? 'Regador' : slot.type === 'seed' ? 'Semente: ' + CONFIG.crops[slot.crop].name : 'Muda: ' + CONFIG.trees[slot.tree].name;
+  return slot.type === 'can' ? CANS[canLevel(state)-1].name : slot.type === 'seed' ? 'Semente: ' + CONFIG.crops[slot.crop].name : 'Muda: ' + CONFIG.trees[slot.tree].name;
 }
 function buildHotbar() {
   const bar = $('hotbar');
@@ -106,11 +110,8 @@ function buildHotbar() {
     const d = el('div', 'slot' + (i === state.selectedSlot ? ' active' : ''));
     d.dataset.slot = i;
     d.append(el('span', 'key', String(i % PAGE + 1)));
-    const sw = el('i', 'swatch');
-    d.title = slotLabel(slot);
-    const col = slot.type === 'seed' ? CONFIG.crops[slot.crop].color : slot.type === 'sapling' ? CONFIG.trees[slot.tree].fruitColor : 0x4FC3F7;
-    sw.style.background = '#' + col.toString(16).padStart(6, '0');
-    d.append(sw);
+    d.title=slotLabel(slot);
+    const img=thumbnail(slot.crop||slot.tree||('can-'+canLevel(state)));d.append(img);
     const b = el('b', null, '0'); b.id = 'slot' + i;
     d.append(b);
     d.addEventListener('click', () => selectSlot(i));
@@ -192,7 +193,10 @@ export function updateHUD() {
   // Hotbar
   HOTBAR.forEach((slot, i) => {
     const b = $('slot' + i); if (!b) return;
-    if (slot.type === 'can') b.textContent = Math.floor(state.water);
+    if (slot.type === 'can') {
+      b.textContent=Math.floor(state.water);const img=b.parentElement.querySelector('img'),key='can-'+canLevel(state);
+      if(img.dataset.key!==key){img.dataset.key=key;img.src='assets/items/'+key+'.png';b.parentElement.title=slotLabel(slot);}
+    }
     else if (slot.type === 'sapling') b.textContent = state.saplings[slot.tree];
     else b.textContent = state.seeds[slot.crop];
     const locked = (slot.type === 'seed' && state.level < CONFIG.crops[slot.crop].level) || (slot.type === 'sapling' && state.level < CONFIG.trees[slot.tree].level);
@@ -213,7 +217,8 @@ export function row(o) {
   const r = el('div', 'shop-item' + (o.locked ? ' locked' : '') + (o.done ? ' done' : ''));
   const info = el('div', 'info');
   const head = el('div', 'head');
-  if (o.icon || o.color != null) {
+  if(o.thumb){const tile=el('div','product-image');tile.append(thumbnail(o.thumb));r.append(tile);}
+  else if (o.icon || o.color != null) {
     const i = el('span', 'ico'); i.textContent = o.icon || '';
     if (o.color != null) { const h = '#' + o.color.toString(16).padStart(6, '0'); i.style.background = 'linear-gradient(145deg,' + h + ',' + h + '99)'; i.style.boxShadow = '0 0 12px ' + h + '66'; }
     head.append(i);
@@ -267,6 +272,7 @@ export function openModal(opts) {
   modal = { id: opts.id, title: opts.title, build: opts.build, opts, tab: same ? modal.tab : 0 };
   state.paused = true;
   $('modalTitle').textContent = opts.title;
+  $('modal').dataset.view=opts.id; $('modal').dataset.market=String(opts.title==='Mercado');
   $('modal').className = 'panel' + (opts.wide ? ' wide' : '');
   $('modalBackdrop').classList.remove('hidden');
   $('modalHint').textContent = opts.hint || 'Pressione ESC para fechar';
@@ -306,6 +312,7 @@ export function closeModal(relock = true) {
 }
 
 export function showResume(v) {
+  if (document.body.classList.contains('touch')) v = false;
   resumeVisible = v;
   const r = $('resume');
   if (r) r.classList.toggle('hidden', !v);
@@ -317,6 +324,8 @@ export function openShop(title, buildTabs) {
   openModal({
     id: 'shop', title, wide: true, hint: 'Pressione E ou ESC para fechar',
     build(body) {
+      const summary=el('div','wallet-line');
+      summary.append(el('strong',null,Math.floor(state.money)+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
       const tabs = buildTabs();
       const { box, index } = makeTabs(body, tabs.map(t => t.name));
       const list = el('div', 'list');
@@ -331,38 +340,39 @@ export function toggleInventory() {
   if (modal && modal.id === 'inventory') { closeModal(); return; }
   if (modal) return;
   openModal({
-    id: 'inventory', title: 'Inventario', hint: 'Pressione I ou ESC para fechar',
-    build(body) {
-      body.append(section('Sementes'));
-      const g1 = el('div', 'inv-grid');
-      CONFIG.cropOrder.forEach(k => {
-        const c = CONFIG.crops[k];
-        g1.append(invItem(c.name, state.seeds[k], state.level < c.level ? 'Nivel ' + c.level : ''));
-      });
-      body.append(g1, section('Colheitas'));
-      const g2 = el('div', 'inv-grid');
-      CONFIG.cropOrder.forEach(k => g2.append(invItem(CONFIG.crops[k].name, state.crops[k])));
-      body.append(g2, section('Produtos'));
-      const g3 = el('div', 'inv-grid');
-      Object.keys(CONFIG.products).forEach(k => g3.append(invItem(CONFIG.products[k].name, state.products[k])));
-      body.append(g3, section('Recursos e equipamento'));
-      const g4 = el('div', 'inv-grid');
-      g4.append(invItem('Agua', Math.floor(state.water) + ' / ' + waterCap()));
-      g4.append(invItem('Energia', Math.floor(state.energy) + ' / ' + maxEnergy()));
-      g4.append(invItem('Cristais', state.crystals));
-      g4.append(invItem('Pontos de pesquisa', Math.floor(state.rp)));
-      g4.append(invItem('Estoque', stockUsed() + ' / ' + stockLimit()));
-      g4.append(invItem('Botas', 'Nivel ' + state.speedLevel));
-      g4.append(invItem('Luvas', 'Nivel ' + state.yieldLevel));
-      g4.append(invItem('Reputacao', reputation()));
-      body.append(g4);
+    id:'inventory',title:'Mochila',wide:true,hint:'I ou Esc para fechar',
+    build(body){
+      const summary=el('div','wallet-line');summary.append(el('strong',null,Math.floor(state.money)+' CR'),el('span',null,'Estoque '+stockUsed()+' / '+stockLimit()));body.append(summary);
+      const {box,index}=makeTabs(body,['Plantio','Colheitas','Equipamento','Pets']);
+      const grid=el('div','inventory-cards');box.append(grid);
+      const card=(key,title,value,action)=>{
+        const node=el(action?'button':'div','pack-card');if(action){node.type='button';node.onclick=action;}
+        if(key)node.append(thumbnail(key));
+        node.append(el('strong',null,title),el('small',null,value));grid.append(node);
+      };
+      if(index===0){
+        HOTBAR.forEach((s,i)=>{
+          if(s.type==='can')return;
+          const qty=s.type==='seed'?state.seeds[s.crop]:state.saplings[s.tree];
+          if(qty>0)card(s.crop||s.tree,slotLabel(s),qty+' · Equipar',()=>{selectSlot(i);closeModal();});
+        });
+        if(!grid.childElementCount)grid.append(el('p',null,'Compre sementes ou mudas na Loja Geral.'));
+      }else if(index===1){
+        for(const [counts,table,field] of [[state.crops,CONFIG.crops,'name'],[state.fruits,CONFIG.trees,'fruit'],[state.products,CONFIG.products,'name']])
+          for(const [key,n] of Object.entries(counts))if(n>0&&table[key])card(key,table[key][field],n+' no estoque');
+        for(const [key,n] of Object.entries(state.mutated)){const [m,k]=key.split(':');if(n>0&&CONFIG.crops[k]&&CONFIG.mutations[m])card(k,CONFIG.crops[k].name+' '+CONFIG.mutations[m].name,n+' no estoque');}
+        if(state.crystals)card('crystal','Cristais',String(state.crystals));
+        if(!grid.childElementCount)grid.append(el('p',null,'As plantas e os frutos que você colher aparecem aqui.'));
+      }else if(index===2){
+        card('can-'+canLevel(state),CANS[canLevel(state)-1].name,Math.floor(state.water)+' / '+waterCap()+' de água · Equipar',()=>{selectSlot(2);closeModal();});
+        for(const [label,value] of [['Botas','Nível '+state.speedLevel],['Luvas','Nível '+state.yieldLevel],['Energia',Math.floor(state.energy)+' / '+maxEnergy()],['Pesquisa',Math.floor(state.rp)+' PP'],['Reputação',reputation()]])card(null,label,String(value));
+      }else{
+        const pets=petRows(false);grid.className='list';
+        if(!pets.length)grid.append(el('p',null,'Adote seu primeiro companheiro na aba Pets da Loja Geral. O gato é grátis.'));
+        pets.forEach(p=>grid.append(row(p)));
+      }
     }
   });
-}
-function invItem(name, value, note) {
-  const d = el('div', 'inv-item');
-  d.append(el('span', null, name + (note ? ' (' + note + ')' : '')), el('b', null, String(value)));
-  return d;
 }
 
 // ---------- Pausa, configuracoes, estatisticas, conquistas ----------
@@ -380,6 +390,7 @@ export function openPauseMenu() {
       const box = el('div', 'menu-list');
       box.append(
         menuButton('Continuar', () => closeModal()),
+        menuButton('Mochila',()=>{closeModal(false);toggleInventory();},'secondary'),
         menuButton('Salvar', () => { save(); showToast('Jogo salvo', 'good'); play('buy'); }),
         menuButton('Multiplayer', () => onMultiplayerCb(), 'secondary'),
         menuButton('Configuracoes', openSettings, 'secondary'),
@@ -601,5 +612,21 @@ export function bindUI(cb) {
   });
   document.addEventListener('pointerlockerror', () => { if (state.mode === 'play' && !modal) showResume(true); });
 }
-import {hosted, api, enterCloud, settle} from './cloud.js';
-import {saveKeyFor} from './accounts.js';
+
+function thumbnail(key){
+  const img=el('img','item-model');img.alt='';img.draggable=false;img.src='assets/items/'+key+'.png';return img;
+}
+export function petRows(shop){
+  return Object.entries(PETS).filter(([key])=>shop||state.adoptedPets.includes(key)).map(([key,def])=>{
+    const owned=state.adoptedPets.includes(key),active=state.activePet===key;
+    return {title:def.name,thumb:'pet-'+key,desc:def.desc,tag:active?'ACOMPANHANDO':owned?'ADOTADO':def.cost?def.cost+' CR':'GRÁTIS',
+      buttons:[{label:active?'Descansar':owned?'Chamar':'Adotar',disabled:!owned&&state.money<def.cost,onClick:()=>{
+        if(!state.adoptedPets.includes(key)){
+          if(state.money<def.cost)return;
+          state.money-=def.cost;state.adoptedPets.push(key);
+        }
+        state.activePet=active?null:key;save();play('buy');
+        showToast(active?def.name+' foi descansar':def.name+' está com você','good');
+      }}]};
+  });
+}

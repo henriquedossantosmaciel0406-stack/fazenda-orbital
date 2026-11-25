@@ -1,4 +1,6 @@
-import { finishStructure, shopfront, entryPorch } from './workshop.js';
+import {cloudField} from './weather.js';
+import { buildTown } from './town.js';
+import { finishStructure } from './workshop.js';
 // Mundo 3D: terreno, estrada, fazenda, cidade, ilha, ponte, modelos de construcoes e decoracoes.
 // Geometrias e materiais sao compartilhados (cache) para manter 60 FPS.
 import * as THREE from 'three';
@@ -431,7 +433,7 @@ export function createWorld(scene) {
     farmRect: CONFIG.farmArea,
     island: CONFIG.island,
     colliders: [
-      { x: 30, z: 17, radius: 3.9 }, { x: 30, z: 35, radius: 3.9 }, { x: -36, z: 5, radius: 1.3 }, { x: -22, z: 6, radius: 3.2 }],
+      { x: -36, z: 5, radius: 1.3 }, { x: -22, z: 6, radius: 3.2 }],
     fixedObstacles: [{ x: -36, z: 5, r: 2 }, { x: -22, z: 6, r: 4 }],
     plotSlots: [], groundMeshes: [], crystalNodes: [], towerSlots: []
   };
@@ -456,7 +458,7 @@ export function createWorld(scene) {
   // --- Solo da fazenda e area de plantio ---
   const soil = M(geo('box', 40, 0.2, 44), mat(0x8B5E3C, { roughness: 1, flatShading: false }));
   soil.position.set(-32, 0.1, -24.5); soil.receiveShadow = true; scene.add(soil);
-  const plaza = M(geo('box', 48, 0.16, 42), mat(0xB9B2A4, { roughness: 0.9, flatShading: false }));
+  const plaza = M(geo('box', 48, 0.16, 42), mat(0xABC085, { roughness: 0.9, flatShading: false }));
   plaza.position.set(30, 0.08, 25); plaza.receiveShadow = true; scene.add(plaza);
 
   // Slots de canteiros: 12 da fazenda (mesmas posicoes do jogo original)
@@ -472,142 +474,8 @@ export function createWorld(scene) {
   // 8 canteiros da ilha
   for (let i = 0; i < 8; i++) world.plotSlots.push({ id: 'i' + i, x: CONFIG.island.x - 8.1 + (i % 4) * 5.4, z: CONFIG.island.z + 4 + Math.floor(i / 4) * 5.4, kind: 'island' });
 
-  // --- Cidade: predios e lojas (formas redondas, sem caixas secas) ---
-  const winMat = emis(0x7FE9FF, 0.4), winSpots = [];
-  const flatRing = (g, r, y, tube, color, seg = 28) => { const t = add(g, M(geo('tor', r, tube, 8, seg), mat(color)), 0, y, 0); t.rotation.x = Math.PI / 2; return t; };
-  const porthole = (x, z, y, a, r) => winSpots.push([x + Math.cos(a) * r, y, z + Math.sin(a) * r, a]);
-  const scallops = (g, n, r, y, size, c1, c2) => { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; add(g, M(geo('sph', size, 8, 6), mat(i % 2 ? c1 : c2)), Math.cos(a) * r, y, Math.sin(a) * r); } };
-
-  // A: casa-domo com torre lateral
-  function houseDome(x, z) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 4.5, 4.7, 0.5, 18), mat(0x9AA6B8)), 0, 0.25, 0);
-    add(g, M(geo('cyl', 4.0, 4.3, 4.6, 18), mat(0xFFE6C8, { side: THREE.DoubleSide })), 0, 2.8, 0);
-    flatRing(g, 4.32, 0.72, 0.11, 0xDDA273);
-    add(g,M(geo('cyl',4.60,4.53,0.23,20),mat(0x3E9188)),0,4.96,0);
-    flatRing(g,4.55,4.91,0.075,0xFFD166);
-    const dome = add(g, M(geo('sph', 4.6, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x3FC9B0)), 0, 5.0, 0); dome.scale.y = 0.95;
-    add(g, M(geo('cyl', 0.12, 0.12, 1.4, 6), mat(0x6B5A7A)), 0, 9.7, 0);
-    add(g, M(geo('sph', 0.42, 10, 8), mat(0xFFD166, { emissive: 0xFFD166, emissiveIntensity: 0.6 })), 0, 10.5, 0);
-    add(g, M(geo('cyl', 1.5, 1.6, 0.25, 14, 1, false, 0, Math.PI), mat(0xD9CBB5)), 0, 0.5, 4.3).rotation.y = Math.PI / 2;
-    const tw = add(g, M(geo('cyl', 1.2, 1.4, 6.4, 12), mat(0xFFB3C7)), 6.8, 3.2, -3.6);
-    add(g, M(geo('cone', 1.9, 2.8, 12), mat(0xFF6FA5)), 6.8, 7.8, -3.6);
-    add(g, M(geo('sph', 0.28, 8, 6), mat(0xFFFFFF)), 6.8, 9.4, -3.6);
-    add(g, M(geo('box', 3.6, 0.2, 1.1), mat(0xD9CBB5)), 4.7, 0.5, -1.9).rotation.y = -0.5;
-    entryPorch(g,4.27,0x40AFA1);
-    world.colliders.push({x,z:z+4.27+0.35,radius:1.28});
-    g.position.set(x, 0, z); scene.add(g);
-    [0.2, 0.75, 1.3, 1.85].forEach(k => porthole(x, z, 3.4, Math.PI * k + 0.4, 4.05));
-    porthole(x + 6.8, z - 3.6, 5.2, 0.5, 1.28);
-  }
-  // B: torre em camadas com cupula torta
-  function houseTower(x, z) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 4.2, 4.5, 0.45, 14), mat(0x9AA6B8)), 0, 0.22, 0);
-    const tiers = [[3.9, 3.6, 3.6, 0xFFD0A8], [3.3, 3.0, 3.4, 0xFFC285], [2.6, 2.3, 3.0, 0xFFB366]];
-    let y = 0.45;
-    tiers.forEach(([rb, rt, h, c], i) => {
-      add(g, M(geo('cyl', rt, rb, h, 14), mat(c)), 0, y + h / 2, 0);
-      y += h;
-      add(g,M(geo('cyl',rt+0.27,rt+0.24,0.19,14),mat(0xDE9870)),0,y,0);
-      flatRing(g, rt + 0.25, y, 0.2, i % 2 ? 0x59E6FF : 0xFF6FA5);
-    });
-    add(g, M(geo('cone', 3.3, 4.4, 14), mat(0xFF7A59)), 0, y + 2.2, 0);
-    add(g, M(geo('sph', 0.9, 12, 8), mat(0xFFE08A, { emissive: 0xFFD166, emissiveIntensity: 0.7 })), 0, y + 4.7, 0);
-    [0, 1, 2].forEach(i => { const a = i * 2.1; add(g, M(geo('sph', 0.55, 8, 6), mat(i % 2 ? 0x59E6FF : 0xFF6FA5)), Math.cos(a) * 2.9, 1.5, Math.sin(a) * 2.9); });
-    entryPorch(g,3.95,0xBC7358);
-    world.colliders.push({x,z:z+3.95+0.35,radius:1.28});
-    g.position.set(x, 0, z); scene.add(g);
-    for (let t = 0; t < 3; t++) for (let k = 0; k < 3; k++) porthole(x, z, 2.4 + t * 3.0, Math.PI * (0.3 + k * 0.75) + t * 0.5, tiers[t][1] + 0.1);
-  }
-  // C: casa-ovo com cobertura espiral e antena
-  function houseEgg(x, z) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 4.2, 4.4, 0.4, 16), mat(0x8FA0B8)), 0, 0.2, 0);
-    const egg = add(g, M(geo('sph', 4.3, 20, 16), mat(0xBFE3FF)), 0, 4.4, 0); egg.scale.set(1, 1.05, 1);
-    const cap = add(g, M(geo('sph', 4.45, 20, 8, 0, Math.PI * 2, 0, 0.95), mat(0x7A6BFF)), 0, 4.4, 0); cap.scale.set(1, 1.05, 1);
-    add(g,M(geo('cyl',3.60,3.48,0.19,20),mat(0x7368B5)),0,7.12,0);
-    flatRing(g, 3.2, 7.9, 0.22, 0xFFD166, 24);
-    add(g, M(geo('cyl', 0.1, 0.12, 2.4, 6), mat(0xC9D8E4)), 0, 10.3, 0);
-    flatRing(g, 0.7, 10.6, 0.08, 0x59E6FF, 16);
-    add(g, M(geo('sph', 0.3, 8, 6), mat(0xFF6FA5, { emissive: 0xFF6FA5, emissiveIntensity: 0.7 })), 0, 11.6, 0);
-    add(g, M(geo('cyl', 1.9, 2.0, 1.6, 14), mat(0xFFE6C8)), -7.2, 0.8, 2.6);
-    add(g, M(geo('sph', 1.9, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xFFB3C7)), -7.2, 1.6, 2.6);
-    entryPorch(g,3.68,0x8C84CA);
-    world.colliders.push({x,z:z+3.68+0.35,radius:1.28});
-    g.position.set(x, 0, z); scene.add(g);
-    [0.3, 0.9, 1.5].forEach(k => porthole(x, z, 4.4 + k * 0.5, Math.PI * (0.25 + k * 0.6), 4.2));
-  }
-  // D: estufa hexagonal com guarda-chuva e torre de cebola
-  function houseHex(x, z) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 4.8, 5.0, 0.4, 14), mat(0x9AA6B8)), 0, 0.2, 0);
-    add(g, M(geo('cyl', 4.3, 4.5, 4.4, 14), mat(0xFFF1B8)), 0, 2.6, 0);
-    const brim = add(g, M(geo('cone', 6.4, 1.6, 12), mat(0x59C96B)), 0, 5.6, 0);
-    add(g, M(geo('cone', 4.3, 3.4, 12), mat(0x3FAF78)), 0, 7.0, 0);
-    scallops(g, 12, 6.0, 4.9, 0.42, 0xFFD166, 0xFF9AE0);
-    add(g, M(geo('sph', 0.6, 10, 8), mat(0xFF6FA5)), 0, 8.9, 0);
-    const bulb = add(g, M(geo('sph', 1.2, 12, 10), mat(0xFFB3C7)), 8.0, 6.6, -4.6); bulb.scale.y = 1.4;
-    add(g, M(geo('cyl', 1.0, 1.1, 5.2, 10), mat(0xFFE6C8)), 8.0, 2.8, -4.6);
-    add(g, M(geo('cone', 0.4, 1.4, 8), mat(0xFF6FA5)), 8.0, 8.9, -4.6);
-    entryPorch(g,4.47,0x54AA75);
-    world.colliders.push({x,z:z+4.47+0.35,radius:1.28});
-    g.position.set(x, 0, z); scene.add(g);
-    [0.3, 0.9, 1.5, 2.1].forEach(k => porthole(x, z, 3.5, Math.PI * k + 0.3, 3.9));
-  }
-  houseDome(16, 12); houseTower(42, 12); houseEgg(16, 40); houseHex(42, 40);
-  [[16, 12, 4.85], [22.8, 8.4, 1.55], [42, 12, 4.6], [16, 40, 4.55], [8.8, 42.6, 2.1], [42, 40, 5.1], [50, 35.4, 1.25]].forEach(([x, z, r]) => world.colliders.push({ x, z, radius: r }));
-  const wins = new THREE.InstancedMesh(geo('cyl', 0.5, 0.5, 0.14, 14), winMat, winSpots.length), wm = new THREE.Matrix4();
-  const wq = new THREE.Quaternion(), wq2 = new THREE.Quaternion(), wsc = new THREE.Vector3(1, 1, 1), wp = new THREE.Vector3(), AX = new THREE.Vector3(1, 0, 0), AY = new THREE.Vector3(0, 1, 0);
-  winSpots.forEach((p, i) => {
-    wq.setFromAxisAngle(AY, -p[3] + Math.PI / 2); wq2.setFromAxisAngle(AX, Math.PI / 2);
-    wq.multiply(wq2);
-    wm.compose(wp.set(p[0], p[1], p[2]), wq, wsc); wins.setMatrixAt(i, wm);
-  });
-  scene.add(wins);
-
-  // Loja Geral: pavilhao redondo com guarda-sol de babados
-  function pavilion(x, z, label, color, c2, signZ) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 3.6, 3.8, 0.35, 20), mat(0xD9CBB5)), 0, 0.17, 0);
-    add(g, M(geo('cyl', 2.3, 2.4, 1.1, 18), mat(0x8A5A34)), 0, 0.9, 0);
-    flatRing(g, 2.35, 1.5, 0.18, color, 24);
-    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; add(g, M(geo('cyl', 0.12, 0.14, 3.2, 8), mat(0x6B5A7A)), Math.cos(a) * 3.0, 1.9, Math.sin(a) * 3.0); }
-    add(g, M(geo('cone', 4.6, 1.9, 16), mat(color)), 0, 4.1, 0);
-    add(g, M(geo('cone', 4.0, 1.4, 16), mat(c2)), 0, 4.55, 0);
-    scallops(g, 16, 4.4, 3.25, 0.5, color, c2);
-    add(g, M(geo('sph', 0.55, 10, 8), mat(0xFFD166, { emissive: 0xFFD166, emissiveIntensity: 0.5 })), 0, 5.5, 0);
-
-    [[-2.9, 0.4], [2.9, -0.4]].forEach(([px, pz]) => add(g, M(geo('cyl', 0.55, 0.6, 1.0, 10), mat(0xB07A44)), px, 0.85, pz + 1.6 * (signZ > 0 ? 1 : -1)));
-    shopfront(g,false);
-    const lbl = makeLabel(label, '#' + color.toString(16).padStart(6, '0'), 5, 1);
-    lbl.position.set(0, 6.4, 0); g.add(lbl);
-    g.position.set(x, 0, z); scene.add(g);
-  }
-  pavilion(30, 17, 'LOJA GERAL', 0x4FE3C1, 0xFFFFFF, -1);
-
-  // Mercado: barraca com toldo listrado em gomos
-  function marketStall(x, z, label, color) {
-    const g = new THREE.Group();
-    add(g, M(geo('cyl', 3.6, 3.8, 0.35, 8), mat(0xD9CBB5)), 0, 0.17, 0);
-    add(g, M(geo('cyl', 2.4, 2.5, 1.2, 8), mat(0xB07A44)), 0, 0.95, 0);
-    flatRing(g, 2.45, 1.58, 0.16, 0xFFD166, 8);
-    add(g,M(geo('cyl',4.78,4.72,0.12,8),mat(0xC6A577)),0,3.11,0);
-    for (let i = 0; i < 8; i++) {
-      const wedge = M(geo('cyl', 0.05, 4.8, 2.2, 1, 1, true, i * Math.PI / 4, Math.PI / 4), mat(i % 2 ? 0xFFFFFF : color, { side: THREE.DoubleSide }));
-      add(g, wedge, 0, 4.2, 0);
-    }
-    for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; add(g, M(geo('sph', 0.34, 8, 6), mat(i % 2 ? 0xFFFFFF : color)), Math.sin(a) * 4.7, 3.15, Math.cos(a) * 4.7); }
-    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; add(g, M(geo('cyl', 0.11, 0.13, 3.0, 8), mat(0x6B5A7A)), Math.cos(a) * 3.1, 1.8, Math.sin(a) * 3.1); }
-    add(g, M(geo('sph', 0.5, 10, 8), mat(0xFF6FA5)), 0, 5.55, 0);
-
-    for (let i = 0; i < 3; i++) add(g, M(geo('cyl', 0.5, 0.5, 0.5, 12), mat(0xFFFFFF)), 3.1 * Math.cos(i * 2 + 1), 0.6, 3.1 * Math.sin(i * 2 + 1));
-    shopfront(g,true);
-    const lbl = makeLabel(label, '#' + color.toString(16).padStart(6, '0'), 5, 1);
-    lbl.position.set(0, 6.5, 0); g.add(lbl);
-    g.position.set(x, 0, z); scene.add(g);
-  }
-  marketStall(30, 35, 'MERCADO', 0xFFD166);
+  const clockTower=buildTown(scene,world);
+  const wm=new THREE.Matrix4();
 
   // --- Bomba de agua (reabastece o regador de graca) ---
   const pump = new THREE.Group();
@@ -646,7 +514,7 @@ export function createWorld(scene) {
   const farm = CONFIG.farmArea;
   const keepOut = (x, z) =>
     (x > farm.x0 - 4 && x < farm.x1 + 4 && z > farm.z0 - 4 && z < farm.z1 + 6) || (Math.abs(x) < 10) ||
-    (x > 6 && x < 58 && z > 4 && z < 50) || (x > -56 && x < -24 && z > -118 && z < -100);
+    (x > 6 && x < 64 && z > 4 && z < 50) || (x > -56 && x < -24 && z > -118 && z < -100);
   [[-108, -48], [-50, 26], [-62, 38], [58, -42], [62, 12], [54, 48], [-22, 48], [22, -52]].forEach(p => treeSpots.push(p));
   let guard = 0;
   while (treeSpots.length < 64 && guard++ < 800) {
@@ -680,14 +548,7 @@ export function createWorld(scene) {
   scene.add(poles, bases, arms, bulbs, caps);
 
   // --- Nuvens e estrelas ---
-  const clouds = new THREE.Group();
-  const cloudMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient, transparent: true, opacity: 0.95, emissive: 0x7F95C8, emissiveIntensity: 0.55 });
-  for (let i = 0; i < 12; i++) {
-    const c = new THREE.Group(); const a = rnd() * Math.PI * 2, r = 80 + rnd() * 220;
-    for (let k = 0; k < 4; k++) { const s = M(geo('ico', 4 + rnd() * 4, 1), cloudMat); s.position.set(k * 4 - 6, rnd() * 2, rnd() * 3); s.scale.y = 0.7; c.add(s); }
-    c.position.set(Math.cos(a) * r, 55 + rnd() * 25, Math.sin(a) * r); clouds.add(c);
-  }
-  scene.add(clouds); world.clouds = clouds;
+  const clouds=cloudField(scene,rnd);world.clouds=clouds.group;
   const sGeo = new THREE.BufferGeometry(); const sPos = new Float32Array(500 * 3);
   for (let i = 0; i < 500; i++) {
     const a = rnd() * Math.PI * 2, b = Math.acos(rnd() * 0.9 + 0.1), r = 380;
@@ -740,10 +601,11 @@ export function createWorld(scene) {
   };
 
   let elapsed = 0;
-  world.update = dt => {
+  world.update = (dt,time=8,weather=null) => {
+    clockTower(time);
     elapsed += dt;
     for (let i = 0; i < PULSES.length; i++) { const p = PULSES[i]; p.m.emissiveIntensity = p.base + Math.sin(elapsed * p.speed) * p.amp * 0.5; }
-    clouds.rotation.y += dt * 0.004;
+    clouds.update(dt,time,weather);
     water.position.y = -6 + Math.sin(elapsed * 0.5) * 0.12;
     // Ponte cresce quando a ilha e liberada
     if (world.islandUnlocked && world.bridgeProgress < 1) world.bridgeProgress = Math.min(1, world.bridgeProgress + dt * 0.35);

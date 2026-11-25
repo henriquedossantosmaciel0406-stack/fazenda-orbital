@@ -1,4 +1,5 @@
 // Estado global, barramento de eventos, calculos derivados e salvamento.
+import { queueSave } from './cloud.js';
 import { CONFIG } from './config.js';
 
 export const LEGACY_KEY = 'fazenda-orbital-v3'; // save antigo (sem conta)
@@ -37,6 +38,7 @@ export const state = {
   products: emptyProducts(),
   crystals: 0,
   saplings: emptyTrees(), fruits: emptyTrees(), mutated: {},
+  expedition: {completed:0,run:null}, adoptedPets: [], activePet: null,
   trees: [], nextTreeId: 1,
   land: { expand: 1, soil: 0, orchard: 0 }, hotbarPage: 0,
   level: 1, xp: 0, xpNeeded: 40,
@@ -126,7 +128,7 @@ export function setObjective(index) {
 // ---------- Salvamento ----------
 export function save() {
   const data = {
-    version: CONFIG.version,
+    version: CONFIG.version, expedition:state.expedition, adoptedPets: state.adoptedPets, activePet: state.activePet,
     money: state.money, water: state.water, maxWater: state.maxWater, energy: state.energy,
     speedLevel: state.speedLevel, yieldLevel: state.yieldLevel,
     seeds: state.seeds, crops: state.crops, products: state.products, crystals: state.crystals,
@@ -183,4 +185,3 @@ export function clearSave() {
   queueSave(null);
   try { localStorage.removeItem(saveKey); } catch (e) { /* ignora */ }
 }
-import {queueSave} from './cloud.js';

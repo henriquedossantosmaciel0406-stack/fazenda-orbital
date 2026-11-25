@@ -73,29 +73,3 @@ export function finishStructure(g,type) {
       for(let i=0;i<3;i++)box(0,0.8+i*0.12,0,1.12-i*0.24,0.10,1.12-i*0.24,i%2?cream:ink);break;
   }
 }
-
-export function shopfront(g,market){
-  const timber=mat(0xA86942),gold=mat(0xF4CD83);
-  for(let i=0;i<3;i++) {
-    const crate=new THREE.Group();crate.position.set((i-1)*1.05,1.62,market?1.45:-1.45);
-    const b=new THREE.Mesh(geo('box',0.91,0.15,0.67),timber);crate.add(b);
-    for(const side of [-1,1]){
-      const rail=new THREE.Mesh(geo('box',0.96,0.18,0.07),gold);rail.position.set(0,0.13,side*0.32);crate.add(rail);
-    }
-    for(let j=0;j<5;j++){const produce=new THREE.Mesh(geo(market?'sph':'ico',0.135,...(market?[8,6]:[0])),mat([0xF38262,0xEABD50,0x82BA69][i]));produce.position.set((j%3-1)*0.24,0.22,(j%2-0.5)*0.25);produce.scale.y=market?0.9:1.45;crate.add(produce);}
-    g.add(crate);
-  }
-}
-export function entryPorch(g,z,color) {
-  const wood=mat(0x855F4D), panel=mat(color), trim=mat(0xFFE1A3);
-  const door=new THREE.Mesh(geo('box',1.23,2.17,0.19),wood);door.position.set(0,1.42,z);g.add(door);
-  const knob=new THREE.Mesh(geo('sph',0.075,8,6),trim);knob.position.set(0.41,1.38,z+0.16);g.add(knob);
-  const window=new THREE.Mesh(geo('cyl',0.27,0.27,0.10,12),mat(0x91D4D4));
-  window.rotation.x=Math.PI/2;window.position.set(0,1.95,z+0.11);g.add(window);
-  for(const side of [-1,1]){
-    const jamb=new THREE.Mesh(geo('box',0.13,2.21,0.22),trim);jamb.position.set(side*0.64,1.41,z);g.add(jamb);
-  }
-  const canopy=new THREE.Mesh(geo('box',2.42,0.21,1.46),panel);canopy.position.set(0,2.69,z+0.21);canopy.rotation.x=0.1;g.add(canopy);
-  for(const x of [-1,1]){const post=new THREE.Mesh(geo('cyl',0.08,0.12,2.31,8),trim);post.position.set(x,1.43,z+0.72);g.add(post);}
-  const stair=new THREE.Mesh(geo('box',2.28,0.28,1.2),trim);stair.position.set(0,0.17,z+0.44);g.add(stair);
-}

@@ -6,13 +6,27 @@
 <title>Fazenda Orbital</title>
 <link rel="preload" href="assets/fonts/baloo-2-latin.woff2" as="font" type="font/woff2" crossorigin/>
 <link rel="stylesheet" href="style.css"/>
+<style>
+#movePad,#touchActions{display:none}
+.touch #game,.touch #movePad{touch-action:none}
+.touch #movePad,.touch #touchActions{position:absolute;bottom:76px;pointer-events:auto;user-select:none;z-index:2}
+.touch #movePad{display:grid;place-items:center;left:12px;width:88px;height:88px;border:2px solid #beb8db;border-radius:50%;color:white;background:#29233dbd;font-size:38px}
+.touch #touchActions{display:grid;right:10px;gap:3px}
+.touch #touchActions button{min-height:40px;border-radius:12px;background:#322749;color:white;font-weight:bold;border:1px solid #b9abc9}
+.touch #keyHelp,.touch .controls{display:none}
+.touch #hotbarWrap{max-width:98vw}
+.touch #hotbar{overflow-x:auto;max-width:96vw}
+.touch .menu-card{max-height:92dvh;overflow:auto}
+</style>
 </head>
 <body>
 <div id="app">
 <canvas id="game"></canvas>
-<p id="syncStatus" role="status" hidden style="position:fixed;bottom:1rem;left:1rem;z-index:99;background:white;color:black;padding:.5rem"></p>
 
+<output hidden id="syncStatus" role="status"></output>
 <div id="hud" class="hidden">
+  <div id="movePad" aria-label="Direcional de movimento">✥</div>
+  <div id="touchActions"><button data-key="KeyE">Usar</button><button data-key="Space">Pular</button><button data-key="KeyI">Mochila</button><button data-key="KeyP">Menu</button></div>
   <div id="crosshair"></div>
   <div id="flash" class="flash"></div>
 
@@ -22,7 +36,7 @@
       <span class="lvl">Nv <b id="level">1</b></span>
     </div>
     <div class="xp"><div id="xpFill"></div></div>
-    <div class="meter water"><div class="fill" id="waterFill"></div><span><i data-icon="drop"></i>Agua <b id="water">10 / 10</b></span></div>
+    <div class="meter water"><div class="fill" id="waterFill"></div><span><i data-icon="drop"></i>Água <b id="water">10 / 10</b></span></div>
     <div class="meter energy"><div class="fill" id="energyFill"></div><span><i data-icon="bolt"></i>Energia <b id="energy">20 / 100</b></span></div>
     <div class="mini"><span>PP <b id="rp">0</b></span><span>REP <b id="rep">0</b></span><span id="crystalRow" class="hidden">CRIST <b id="crystals">0</b></span></div>
   </div>
@@ -50,7 +64,7 @@
     <div id="slotName"></div>
     <div id="hotbar"></div>
   </div>
-  <div id="keyHelp">E interagir - Tab hotbar - I inventario - G drones - C contratos - P pausa - H esconder ajuda</div>
+  <div id="keyHelp">Espaço pular - E interagir - Tab hotbar - I mochila - G drones - C contratos - P pausa - H esconder ajuda</div>
 </div>
 
 <div id="modalBackdrop" class="hidden"></div>

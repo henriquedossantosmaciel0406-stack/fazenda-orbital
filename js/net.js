@@ -1,3 +1,4 @@
+import {makeFarmer,animateFarmer,companion,PETS} from './actors.js';
 import {varySpecimen} from './botany.js';
 import { waterJet } from './water.js';
 // Multiplayer por codigo: um jogador cria a sala (host), os amigos entram pelo codigo.
@@ -131,59 +132,12 @@ async function joinLocal(code, h) {
 const hueOf = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; };
 
 function makeAvatar(nick) {
-  const g = new THREE.Group(), rig = new THREE.Group();
-  const h = hueOf(nick), c = new THREE.Color().setHSL(h / 360, 0.8, 0.58).getHex(), c2 = new THREE.Color().setHSL(((h + 40) % 360) / 360, 0.85, 0.62).getHex();
-  const skin = 0xFFD9B3;
-  const mk = (geom, material, x = 0, y = 0, z = 0, parent = rig) => { const m = new THREE.Mesh(geom, material); m.position.set(x, y, z); parent.add(m); return m; };
-  // corpo e cabeca bem redondos
-  const body = mk(geo('sph', 0.34, 14, 10), mat(c), 0, 0.5, 0); body.scale.set(1, 1.08, 0.9); body.castShadow = true;
-  const head = mk(geo('sph', 0.4, 16, 12), mat(skin), 0, 1.2, 0); head.castShadow = true;
-  // rosto: olhos com brilho, bochechas e sorriso
-  const dark = mat(0x2A1B3D);
-  for (const sx of [-1, 1]) {
-    mk(geo('sph', 0.065, 8, 6), dark, sx * 0.15, 1.24, 0.35).scale.set(1, 1.3, 0.6);
-    mk(geo('sph', 0.022, 6, 5), mat(0xFFFFFF), sx * 0.15 + 0.02, 1.28, 0.385);
-    mk(geo('sph', 0.075, 8, 6), mat(0xFF8FA3), sx * 0.25, 1.12, 0.29).scale.set(1, 0.6, 0.4);
-  }
-  const smile = mk(geo('tor', 0.075, 0.018, 6, 12, Math.PI), dark, 0, 1.15, 0.385); smile.rotation.z = Math.PI;
-  // bracos e pes
-  const arms = [];
-  for (const sx of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(sx * 0.36, 0.7, 0); rig.add(arm);
-    mk(geo('cyl', 0.075, 0.07, 0.34, 8), mat(c), 0, -0.15, 0, arm);
-    mk(geo('sph', 0.085, 8, 6), mat(skin), 0, -0.34, 0, arm);
-    arms.push(arm);
-    mk(geo('sph', 0.13, 8, 6), dark, sx * 0.15, 0.08, 0.06).scale.set(1, 0.6, 1.3);
-  }
-  // chapeu varia conforme o nick
-  const v = h % 4;
-  if (v === 0) { // bone com aba
-    mk(geo('sph', 0.42, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(c2), 0, 1.3, 0);
-    mk(geo('cyl', 0.3, 0.3, 0.04, 14, 1, false, 0, Math.PI), mat(c2), 0, 1.33, 0.32).rotation.y = -Math.PI / 2;
-  } else if (v === 1) { // gorro com pompom
-    mk(geo('sph', 0.43, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(c2), 0, 1.3, 0);
-    mk(geo('tor', 0.4, 0.07, 6, 16), mat(0xFFFFFF), 0, 1.32, 0).rotation.x = Math.PI / 2;
-    mk(geo('sph', 0.11, 8, 6), mat(0xFFFFFF), 0, 1.76, 0);
-  } else if (v === 2) { // folhinhas de broto
-    mk(geo('cyl', 0.02, 0.025, 0.2, 5), mat(0x4FBF68), 0, 1.68, 0);
-    for (const sx of [-1, 1]) { const l = mk(geo('sph', 0.12, 8, 6), mat(0x6ACB5A), sx * 0.11, 1.8, 0); l.scale.set(1.4, 0.5, 0.8); l.rotation.z = sx * 0.5; }
-  } else { // chapeu de palha
-    mk(geo('cyl', 0.62, 0.62, 0.04, 16), mat(0xF2D28B), 0, 1.45, 0);
-    mk(geo('sph', 0.3, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xF2D28B), 0, 1.46, 0);
-    mk(geo('tor', 0.3, 0.035, 6, 16), mat(c2), 0, 1.49, 0).rotation.x = Math.PI / 2;
-  }
-  mk(geo('box',0.36,0.3,0.09),mat(0x344B66),0,0.54,0.29);
-  for(const side of [-1,1]) {
-    mk(geo('box',0.067,0.29,0.08),mat(0x344B66),side*0.155,0.73,0.25).rotation.z=-side*0.13;
-    mk(geo('sph',0.03,6,4),mat(0xFFD074),side*0.14,0.65,0.35);
-  }
-  g.add(rig);
-  addOutline(body, 0.022); addOutline(head, 0.024);
+  const g=makeFarmer(hueOf(nick));
   const label = makeLabel(nick, '#FFD166', 3.4, 0.76);
   label.position.y = 2.3; label.renderOrder = 20;
   if (label.material) { label.material.depthTest = false; label.material.fog = false; }
   g.add(label);
-  g.userData.label = label; g.userData.rig = rig; g.userData.arms = arms;
+  g.userData.label = label;
   // facho de luz: permite achar o amigo de longe
   const beam = new THREE.Mesh(geo('cyl', 0.07, 0.07, 40, 6), glow(0xFFD166, 0.35)); beam.position.y = 22; g.add(beam);
   return g;
@@ -271,7 +225,7 @@ function addRemote(id, nick) {
   let slot = 0; while (used.has(slot)) slot++;
   if (slot >= SLOT_OFFSET.length) return null;
   nick = nick || 'Jogador';
-  r = { id, nick, slot, lvl: 1, avatar: makeAvatar(nick), farm: makeFarmView(nick, SLOT_OFFSET[slot]), pos: new THREE.Vector3(), target: new THREE.Vector3(), yaw: 0, snap: null, fresh: true };
+  r = { id, nick, slot, lvl: 1, avatar: makeAvatar(nick), pet:companion(scene), petType:null, farm: makeFarmView(nick, SLOT_OFFSET[slot]), pos: new THREE.Vector3(), target: new THREE.Vector3(), yaw: 0, snap: null, fresh: true };
   scene.add(r.avatar);
   N.remotes.set(id, r);
   showToast(nick + ' entrou na sala', 'good'); play('mission');
@@ -285,7 +239,7 @@ function removeRemote(id) {
   const off=SLOT_OFFSET[r.slot];
   if (onParcel(camera.position.x-off.x,camera.position.z-off.z,r.farm.island.visible)) camera.position.set(-32,1.7,0);
   refundPending(id);
-  scene.remove(r.avatar, r.farm.root);
+  r.pet.remove(); scene.remove(r.avatar, r.farm.root);
   disposeTree(r.avatar); disposeTree(r.farm.root);
   N.remotes.delete(id);
   showToast(r.nick + ' saiu da sala', 'info');
@@ -376,7 +330,8 @@ function handle(fromId, m) {
   if (m.t === 'pos') {
     const owner = m.farm ? N.remotes.get(m.farm) : null;
     const off = owner ? SLOT_OFFSET[owner.slot] : null;
-    r.target.set(m.x + (off?.x || 0), 0, m.z + (off?.z || 0)); r.yaw = m.r;
+    r.petType=Object.hasOwn(PETS,m.pet)?m.pet:null;
+    r.target.set(m.x + (off?.x || 0), Number.isFinite(m.jump)?Math.min(2,Math.max(0,m.jump)):0, m.z + (off?.z || 0)); r.yaw = m.r;
     if (r.fresh) { r.pos.copy(r.target); r.fresh = false; }
   } else if (m.t === 'farm') { const changed=!!m.s.island!==r.farm.island.visible; r.snap = m.s; applySnapshot(r, m.s); if(changed) refreshModal(); }
 }
@@ -554,7 +509,7 @@ export function leave(silent) {
   if ([...N.remotes.values()].some(r=>{const o=SLOT_OFFSET[r.slot];return onParcel(camera.position.x-o.x,camera.position.z-o.z,r.farm.island.visible);})) visit(null,'home');
   try { N.tr && N.tr.close(); } catch (e) { /* ignora */ }
   for (const id of [...N.remotes.keys()]) refundPending(id);
-  for (const id of [...N.remotes.keys()]) { const r = N.remotes.get(id); scene.remove(r.avatar, r.farm.root); disposeTree(r.avatar); disposeTree(r.farm.root); N.remotes.delete(id); }
+  for (const id of [...N.remotes.keys()]) { const r = N.remotes.get(id); r.pet.remove(); scene.remove(r.avatar, r.farm.root); disposeTree(r.avatar); disposeTree(r.farm.root); N.remotes.delete(id); }
   N.mode = 'solo'; N.code = null; N.tr = null; N.myId = null;
   refreshChip(); refreshModal();
   if (!silent) showToast('Voce saiu da sala', 'info');
@@ -710,9 +665,10 @@ export function updateNet(dt) {
     }
     camera.getWorldDirection(tmpDir);
     const r = Math.atan2(-tmpDir.x, -tmpDir.z);
-    send({ t: 'pos', id: N.myId, farm, x: +x.toFixed(2), z: +z.toFixed(2), r });
-    const moved = x !== N.last.x || z !== N.last.z || r !== N.last.r;
-    N.last = {x, z, r}; N.tPos = play_ && moved ? 0.1 : 0.25;
+    const jump=+Math.max(0,camera.position.y-CONFIG.player.height).toFixed(2);
+    send({ t: 'pos', jump,pet:state.activePet, id: N.myId, farm, x: +x.toFixed(2), z: +z.toFixed(2), r });
+    const moved = x !== N.last.x || z !== N.last.z || r !== N.last.r || jump!==N.last.jump;
+    N.last = {x, z, r,jump}; N.tPos = play_ && moved ? 0.1 : 0.25;
   }
   N.tFarm -= dt;
   if (N.tFarm <= 0) { N.tFarm = 2; sendFarm(); }
@@ -726,9 +682,8 @@ export function updateNet(dt) {
     // andar: pulinho e bracos balancando enquanto ele se move
     const sp = r.pos.distanceTo(r.target);
     r.walk = THREE.MathUtils.lerp(r.walk || 0, sp > 0.05 ? 1 : 0, k);
-    const ph = N.clock * 11, ud = r.avatar.userData;
-    ud.rig.position.y = Math.abs(Math.sin(ph)) * 0.09 * r.walk;
-    ud.arms[0].rotation.x = Math.sin(ph) * 0.9 * r.walk; ud.arms[1].rotation.x = -Math.sin(ph) * 0.9 * r.walk;
+    animateFarmer(r.avatar,N.clock,r.walk,r.pos.y);
+    r.pet.update(r.petType,r.pos,dt,N.clock,world);
     r.avatar.rotation.y = r.yaw + Math.PI;
 
     if (r.farm.root.visible) for (const g of r.farm.structs.values()) animateStructure(g, N.clock, dt);

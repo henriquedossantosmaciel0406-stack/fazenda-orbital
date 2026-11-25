@@ -1,3 +1,6 @@
+import {openExpedition} from './expedition.js';
+import {CANS,canLevel,canEfficiency} from './gear.js';
+import {makeFarmer,animateFarmer,companion} from './actors.js';
 import {createWateringCan} from './watering-can.js';
 import { initWater, updateWater, waterJet } from './water.js';
 import { fillCrop, fillTree, varySpecimen } from './botany.js';
@@ -12,7 +15,7 @@ import {
 import { CONFIG } from './config.js';
 import {
   showToast, updateHUD, setPrompt, setBuildHint, openShop, openModal, closeModal, isModalOpen, modalId,
-  toggleInventory, row, el, flash, selectSlot, isResumeVisible, openPauseMenu
+  toggleInventory, petRows, row, el, flash, selectSlot, isResumeVisible, openPauseMenu
 } from './ui.js';
 import { geo, mat, glow, createStructureModel, applyStructureLevel, animateStructure } from './world.js';
 import { cachedMerged, vcMat, vcMatWet } from './optimize.js';
@@ -43,7 +46,7 @@ const trees = [];     // arvores: { data, group, mesh, stageKey, dirty }
 let irrigators = [];
 const fx = { rain: 0, reactor: 0 };
 let build = null; // modo construcao { type | tree, x, z, reason }
-let wateringCan;
+let wateringCan, myPet;
 const ghosts = {}, treeGhosts = {};
 let ghostRing, ringOk, ringBad;
 const pickupMeshes = new Map();
@@ -183,7 +186,7 @@ function waterPlot(plot, byDrone) {
   const crop = CONFIG.crops[plot.crop];
   const used = Math.min(state.water, crop.waterUse);
   state.water -= used;
-  plot.water = Math.min(12, plot.water + used);
+  plot.water = Math.min(12, plot.water + used*(byDrone?1:canEfficiency(state)));
   plot.progress = Math.min(crop.growTime, plot.progress + used * 2);
   const wasSick = plot.sick;
   plot.sick = false; plot.dirty = true;
@@ -309,7 +312,7 @@ function harvestTree(tree, byDrone) {
 function waterTree(tree, byDrone) {
   if (state.water < 0.5 || tree.water >= 6) return false;
   const used = Math.min(state.water, 2);
-  state.water -= used; tree.water = Math.min(8, tree.water + used * 2.5);
+  state.water -= used; tree.water = Math.min(8, tree.water + used * 2.5*(byDrone?1:canEfficiency(state)));
   if (!byDrone) {
     const tip = wateringCan.pour();
     waterJet(tip.x,tip.y,tip.z,tree.x,0.55,tree.z);
@@ -733,7 +736,7 @@ function buyEquip(key) {
   if (state.money < cost || equipLevel(key) >= u.max) { play('error'); return; }
   state.money -= cost;
   if (key === 'speed') state.speedLevel++; else if (key === 'water') { state.maxWater += 10; state.water = Math.min(state.maxWater, state.water + 10); } else state.yieldLevel++;
-  addXp(12); play('upgrade'); showToast(u.name + ' melhorado(a)', 'good'); save();
+  addXp(12); play('upgrade'); showToast(key==='water' ? CANS[canLevel(state)-1].name+' equipado' : u.name+' melhorado(a)', 'good'); save();
 }
 
 function structureRow(type) {
@@ -743,7 +746,7 @@ function structureRow(type) {
   const costTxt = def.cost + ' CR' + (def.crystals ? ' + ' + def.crystals + ' cristais' : '');
   const effTxt = def.effect ? '  |  ' + def.effect(1) : '  |  Reputacao +' + def.rep;
   return row({
-    title: def.name, desc: def.desc + effTxt + '  |  Custo: ' + costTxt, locked,
+    thumb:type,title: def.name, desc: def.desc + effTxt + '  |  Custo: ' + costTxt, locked,
     color: def.irrigator ? 0x4FC3F7 : def.kind === 'decor' ? 0xFF9AE0 : 0x4FE3C1, icon: def.irrigator ? 'IRR' : null,
     tag: state.level < def.level ? 'NIVEL ' + def.level : (def.island && !state.islandUnlocked) ? 'ILHA' : (def.minRep || 0) > reputation() ? 'REP ' + def.minRep : owned + ' / ' + max,
     tagCls: locked ? 'bad' : '',
@@ -756,7 +759,7 @@ function openGeneralStore() {
     const seeds = CONFIG.cropOrder.map(k => {
       const c = CONFIG.crops[k], locked = state.level < c.level;
       return {
-        icon: c.short, color: c.color, title: 'Semente de ' + c.name,
+        thumb:k, color: c.color, title: 'Semente de ' + c.name,
         desc: 'Custo ' + c.seedCost + ' CR  |  Cresce em ' + c.growTime + 's  |  Vende por ' + c.sellPrice + ' CR  |  Agua ' + c.waterUse,
         tag: locked ? 'NIVEL ' + c.level : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,
         buttons: [
@@ -772,7 +775,7 @@ function openGeneralStore() {
     CONFIG.treeOrder.forEach(k => {
       const d = CONFIG.trees[k], locked = state.level < d.level;
       treeItems.push({
-        icon: d.short, color: d.fruitColor, title: 'Muda de ' + d.name,
+        thumb:k, color: d.fruitColor, title: 'Muda de ' + d.name,
         desc: 'Custo ' + d.saplingCost + ' CR  |  Amadurece em ' + d.growTime + 's  |  ate ' + d.maxFruits + ' frutos, 1 a cada ' + d.fruitEvery + 's  |  ' + d.fruit + ' vale ' + d.price + ' CR',
         tag: locked ? 'NIVEL ' + d.level : 'Voce tem ' + state.saplings[k], tagCls: locked ? 'bad' : '', locked,
         buttons: [
@@ -796,13 +799,20 @@ function openGeneralStore() {
         buttons: nx ? [{ label: 'Melhorar - ' + nx.cost + ' CR', disabled: locked || state.money < nx.cost, onClick: () => buyLand(k) }] : []
       };
     });
-    const equip = Object.keys(CONFIG.upgrades).map(k => {
+    const equip = Object.keys(CONFIG.upgrades).filter(k=>k!=='water').map(k => {
       const u = CONFIG.upgrades[k], lv = equipLevel(k), maxed = lv >= u.max, cost = equipCost(k);
       return {
         title: u.name, desc: u.desc, tag: 'Nivel ' + lv + ' / ' + u.max, tagCls: maxed ? 'good' : '', done: maxed,
         color: 0xFFD166, icon: k === 'speed' ? 'VEL' : k === 'water' ? 'AGU' : 'COL',
         buttons: maxed ? [] : [{ label: 'Melhorar - ' + cost + ' CR', disabled: state.money < cost, onClick: () => buyEquip(k) }]
       };
+    });
+    const cl=canLevel(state),canCost=equipCost('water');
+    const cans=CANS.map((can,i)=>{
+      const next=i===cl,owned=i<cl;
+      return {thumb:'can-'+(i+1),title:can.name,desc:((i+1)*10)+' de capacidade · '+(100+i*25)+'% de rega por unidade de água',
+        tag:i===cl-1?'EQUIPADO':owned?'ADQUIRIDO':next?'DISPONÍVEL':'REQUER '+CANS[i-1].name.toUpperCase(),
+        buttons:next?[{label:'Comprar · '+canCost+' CR',disabled:state.money<canCost,onClick:()=>buyEquip('water')}]:[]};
     });
     const droneWhy = state.level < CONFIG.drone.level ? 'Nivel ' + CONFIG.drone.level : state.drones.length >= 4 ? 'Limite atingido' : null;
     const drones = [
@@ -817,13 +827,15 @@ function openGeneralStore() {
     const keys = Object.keys(CONFIG.structures);
     return [
       { name: 'Sementes', items: seeds },
-      { name: 'Arvores', items: treeItems },
+      { name: 'Árvores', items: treeItems },
+      { name: 'Regadores', items:cans },
+      { name:'Pets',items:petRows(true) },
       { name: 'Terreno', items: landItems },
-      { name: 'Irrigacao', items: keys.filter(k => CONFIG.structures[k].irrigator).map(structureRow) },
+      { name: 'Irrigação', items: keys.filter(k => CONFIG.structures[k].irrigator).map(structureRow) },
       { name: 'Equipamento', items: equip },
       { name: 'Drones', items: drones },
-      { name: 'Construcoes', items: keys.filter(k => CONFIG.structures[k].kind === 'building' && !CONFIG.structures[k].irrigator).map(structureRow) },
-      { name: 'Decoracao', items: keys.filter(k => CONFIG.structures[k].kind === 'decor').map(structureRow) }
+      { name: 'Construções', items: keys.filter(k => CONFIG.structures[k].kind === 'building' && !CONFIG.structures[k].irrigator).map(structureRow) },
+      { name: 'Decoração', items: keys.filter(k => CONFIG.structures[k].kind === 'decor').map(structureRow) }
     ];
   });
 }
@@ -893,7 +905,7 @@ function openMarket() {
       else if (kind === 'mut') { color = CONFIG.mutations[key.split(':')[0]].color; extra = 'MUTANTE'; }
       else if (kind === 'crystal') color = 0x59E6FF;
       items.push({
-        title: itemName(kind, key), color, desc: 'Preco ' + price + ' CR cada  |  Bonus de reputacao +' + Math.round((priceBonus() - 1) * 100) + '%',
+        thumb:kind==='mut'?key.split(':')[1]:kind==='crystal'?'crystal':key,title: itemName(kind, key), color, desc: 'Preco ' + price + ' CR cada  |  Bonus de reputacao +' + Math.round((priceBonus() - 1) * 100) + '%',
         tag: extra || 'Voce tem ' + count, tagCls: extra ? 'gold' : '',
         buttons: [
           { label: 'Vender 1', onClick: () => sellItem(kind, key, 1) },
@@ -1015,6 +1027,7 @@ function findTarget() {
   const c = camera.position;
   if (flat(c, world.shopPosition.x, world.shopPosition.z) < 5.5) target.type = 'shop';
   else if (flat(c, world.marketPosition.x, world.marketPosition.z) < 5.5) target.type = 'market';
+  else if (flat(c,world.portPosition.x,world.portPosition.z)<4.6) target.type='space';
   else if (flat(c, world.pumpPosition.x, world.pumpPosition.z) < 3.4) target.type = 'pump';
   else if (flat(c, world.stationPosition.x, world.stationPosition.z) < 5) target.type = 'station';
   else if (!state.islandUnlocked && flat(c, world.gatePosition.x, world.gatePosition.z) < 8) target.type = 'gate';
@@ -1040,6 +1053,7 @@ function promptFor() {
     case 'structure': return 'E - ' + target.ref.def.name + (target.ref.def.kind === 'building' ? ' (nivel ' + target.ref.data.level + ')' : '');
     case 'pickup': return 'E - Coletar meteorito de sementes';
     case 'crystal': return 'E - Coletar cristal';
+    case 'space': return 'E - Porto orbital · nível 12';
     case 'shop': return 'E - Abrir Loja Geral';
     case 'market': return 'E - Abrir Mercado';
     case 'pump': return 'E - Encher regador';
@@ -1058,6 +1072,7 @@ function interact() {
     case 'structure': openStructurePanel(r); break;
     case 'pickup': collectPickup(r); break;
     case 'crystal': mineCrystal(r); break;
+    case 'space': openExpedition(); break;
     case 'shop': openGeneralStore(); break;
     case 'market': openMarket(); break;
     case 'pump': useWaterPump(); break;
@@ -1099,16 +1114,8 @@ function bindInteraction() {
 //  VISITANTES
 // ======================================================================
 function createVisitors() {
-  const cols = [0xFF6FA5, 0x59E6FF, 0xFFD166, 0xB26BFF, 0x7ED957, 0xFF9A3C];
-  for (let i = 0; i < 6; i++) {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(geo('cyl', 0.22, 0.28, 0.95, 7), mat(cols[i])); body.position.y = 0.55;
-    const head = new THREE.Mesh(geo('sph', 0.21, 8, 6), mat(0xF2C9A0)); head.position.y = 1.25;
-    const pack = new THREE.Mesh(geo('box', 0.3, 0.4, 0.14), mat(0x3D4A5C)); pack.position.set(0, 0.65, -0.26);
-    const hat=new THREE.Mesh(geo('cyl',0.29,0.33,0.10,12),mat(0xDCA762));hat.position.y=1.42;
-    const crown=new THREE.Mesh(geo('sph',0.21,10,7),mat(0xF5C981));crown.position.y=1.45;crown.scale.y=0.66;
-    for(const side of [-1,1]){const shoe=new THREE.Mesh(geo('sph',0.12,7,5),mat(0x453A3E));shoe.scale.set(0.8,0.72,1.4);shoe.position.set(side*0.12,0.09,0.06);g.add(shoe);}
-    g.add(body, head, pack,hat,crown); g.visible = false; scene.add(g);
+  for(let i=0;i<6;i++){
+    const g=makeFarmer(i+3);scene.add(g);g.visible=false;
     visitors.push({ group: g, target: new THREE.Vector3(), wait: 0, active: false, atStruct: false, phase: Math.random() * 6 });
   }
 }
@@ -1138,6 +1145,7 @@ function updateVisitors(dt, t) {
     const v = visitors[i], g = v.group;
     if (i >= want) { if (v.active) { v.active = false; g.visible = false; } continue; }
     if (!v.active) { v.active = true; g.visible = true; g.position.set(-9, 0, 14 + i); pickVisitorTarget(v); v.wait = 0; }
+    animateFarmer(g,t+v.phase,v.wait>0?0:1);
     if (v.wait > 0) { v.wait -= dt; g.position.y = 0; continue; }
     tmpV.set(v.target.x - g.position.x, 0, v.target.z - g.position.z);
     const d = tmpV.length();
@@ -1215,7 +1223,7 @@ function cullFar() {
 export function initGame(sceneRef, cameraRef, worldRef) {
   scene = sceneRef; camera = cameraRef; world = worldRef;
   plotGroup = new THREE.Group(); scene.add(plotGroup);
-  initEffects(scene, camera); initWater(scene); wateringCan=createWateringCan(camera);
+  initEffects(scene, camera); initWater(scene); wateringCan=createWateringCan(camera); myPet=companion(scene);
 
   ringOk = new THREE.MeshBasicMaterial({ color: 0x4FE3C1, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
   ringBad = new THREE.MeshBasicMaterial({ color: 0xFF5470, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
@@ -1269,9 +1277,10 @@ export function initGame(sceneRef, cameraRef, worldRef) {
 
 export function updateGame(dt) {
   clock += dt; updateWater(dt);
+  if(state.mode==='play')myPet.update(state.activePet,camera.position,dt,clock,world);
   wateringCan.update(dt,state.mode==='play' && !state.paused && HOTBAR[state.selectedSlot]?.type==='can',clock);
-  if (state.mode !== 'play') { world.update(dt); updateEffects(dt); return; }
-  if (state.paused || isResumeVisible()) { setPrompt(''); updateEffects(dt); world.update(dt); return; }
+  if (state.mode !== 'play') { world.update(dt,state.time,state.event?.id); updateEffects(dt); return; }
+  if (state.paused || isResumeVisible()) { setPrompt(''); updateEffects(dt); world.update(dt,state.time,state.event?.id); return; }
 
   state.stats.play += dt;
   const day = updateDayNight(dt);
@@ -1284,7 +1293,7 @@ export function updateGame(dt) {
   updateDrones(dt, camera, clock);
   updateVisitors(dt, clock);
   updateEffects(dt);
-  world.update(dt);
+  world.update(dt,state.time,state.event?.id);
 
   if (!state.islandUnlocked && state.level >= CONFIG.islandLevel) unlockIsland();
   if ((availTimer -= dt) <= 0) { availTimer = 1; if (state.research.towers) refreshAvailability(true); }

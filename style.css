@@ -285,3 +285,40 @@ button.link{background:none!important;border:0!important;box-shadow:none!importa
 @media (max-height:560px){.menu-card{padding:16px 22px}.menu-card h1{font-size:30px;margin:0 0 4px}.auth-tabs{margin:8px 0 2px}#authForm{gap:8px;margin-top:6px}#authForm input{padding:8px 11px}.menu-card .controls{display:none}.fine{margin-top:8px!important}}
 #authForm label.check{display:flex;flex-direction:row;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
 #authForm label.check input{width:auto;padding:0;accent-color:#3FF0CB}
+
+.item-model{display:block;width:56px;height:56px;object-fit:contain;pointer-events:none}
+.slot .item-model{width:82%;height:82%;filter:drop-shadow(0 2px 1px #34283799)}
+.slot{background:linear-gradient(160deg,#fcf2cd,#cfbb88);border-color:#36423c}
+.slot .key,.slot b{opacity:1;color:white;z-index:1;background:#36423c;border-radius:5px;padding:0 3px;line-height:1.15}
+.slot.active{background:linear-gradient(150deg,#ddffbd,#91d8a4);border-color:#236959}
+.slot.locked{opacity:.72;filter:saturate(.65)}
+#modal:is([data-view="shop"],[data-view="inventory"],[data-view="space"]){--catalog:#226859;--tint:#e0edcf;background:#faf1d9;color:#303f37;border:3px solid #36463a;box-shadow:0 6px 0 #273f35,0 15px 48px #17292570}
+#modal[data-market="true"]{--catalog:#98472f;--tint:#f5dbc0}
+#modal:is([data-view="shop"],[data-view="inventory"],[data-view="space"]) .modal-head{border-bottom:2px solid #c6b793;align-items:center;margin-bottom:10px}
+#modal:is([data-view="shop"],[data-view="inventory"],[data-view="space"]) h3{color:var(--catalog);text-shadow:none;letter-spacing:0;font-size:clamp(24px,4vw,34px)}
+#modal:is([data-view="shop"],[data-view="inventory"],[data-view="space"]) #modalClose{color:var(--catalog);border:1px solid #bdaf8b;background:#fffbeb}
+.wallet-line{display:flex;gap:12px;align-items:center;color:#485e50;margin-bottom:10px;font-size:13px}
+.wallet-line strong{color:#54380e;background:#ffdc83;border:1px solid #caa35a;border-radius:24px;padding:2px 12px}
+#modal:is([data-view="shop"],[data-view="inventory"]) .tabs button{background:#fffaf0;color:#48594d;border:1px solid #c5bb9f;box-shadow:none}
+#modal:is([data-view="shop"],[data-view="inventory"]) .tabs .active{background:var(--catalog);color:white;border-color:var(--catalog)}
+#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item{display:grid;grid-template-columns:auto 1fr;background:#fffbee;border:1px solid #c8bea1;border-radius:15px;color:#334537;padding:11px;gap:5px 10px}
+#modal:is([data-view="shop"],[data-view="inventory"]) .list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));align-items:start}
+#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item .info:only-child,#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item .info:first-child{grid-column:1/-1}
+.product-image{background:var(--tint);align-self:start;border-radius:12px;padding:3px}
+#modal:is([data-view="shop"],[data-view="inventory"]) .btns{grid-column:1/-1;justify-content:flex-end;flex-wrap:wrap}
+#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item button,.space-btn{background:var(--catalog);color:white;border:0;border-radius:10px;box-shadow:0 2px 0 #254b3d;cursor:pointer}
+#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item.locked{opacity:.78}
+#modal:is([data-view="shop"],[data-view="inventory"]) .badge{color:#314a3e;background:#e7ecd9;border:1px solid #b5c2a7}
+.inventory-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px}
+.pack-card{display:grid;justify-items:start;align-content:start;gap:3px;margin:0;background:#fffbea;color:#324b40;border:1px solid #beb899;border-radius:14px;padding:12px;text-align:left;font:inherit}
+button.pack-card{cursor:pointer}.pack-card:hover{border-color:#558b71}.pack-card small{color:#52675b}.inventory-cards p{grid-column:1/-1}
+#recoveryNotice{background:#fff0c5;color:#453a2b;border-radius:12px;padding:10px;font-size:13px}#recoveryNotice code{display:block;user-select:all;font-size:12px}#recoveryNotice .link{color:#275a4c!important}
+#syncStatus{position:absolute;top:4px;left:50%;transform:translateX(-50%);max-width:85vw;color:#341c10;background:#ffe3ad;z-index:40;font-size:13px;padding:6px 12px;border-radius:10px}
+@media(max-width:550px){#hotbar{gap:2px}.slot{width:min(9.2vw,43px);height:min(10vw,44px)}#hotbarWrap{transform:translateX(-50%)}#modal.wide{padding:12px}}
+.star-map{width:100%;height:auto;max-height:42vh;object-fit:contain;background:#1c3049;border:2px solid #3d514d;border-radius:13px;display:block}
+.mission-heading{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}.mission-heading h4,.route-card h4{margin:0;font-size:20px;color:#29574e}
+.ship-status{font-size:13px;font-weight:700}.mission-heading{margin:3px 0 8px}.space-mission,.flight-log,.route-card p{margin:5px 0;line-height:1.25}
+.flight-log{color:#6e431d;min-height:1.2em}.space-btn{font:inherit;font-weight:700;padding:6px 12px}.space-btn:disabled{background:#d1ccb9;color:#514f44;box-shadow:none;cursor:default}
+.orbital-routes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:10px}.route-card{padding:12px;background:#fffaed;border:1px solid #c9bf9e;border-radius:12px}.route-card small{display:block;margin:7px 0}
+.mission-controls,.pilot-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.mission-controls{justify-content:space-between}.space-pad{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:25px 25px;gap:3px}.space-pad button{padding:0}.space-pad [data-dir=north]{grid-column:2}.space-pad [data-dir=west]{grid-column:1}.flight-help{display:block;margin-top:6px;color:#4f6455}
+#modal:is([data-view="shop"],[data-view="inventory"]) .shop-item{animation:none}

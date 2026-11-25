@@ -37,7 +37,7 @@ const dynamic = new Set([world.clouds, world.water, world.islandRocks, world.bri
 const underDynamic = o => { for (let p = o; p; p = p.parent) if (dynamic.has(p) || (world.overlays && world.overlays.includes(p))) return true; return false; };
 const skipMerge = o => underDynamic(o) || o.material === world.gateMat || o.userData.keep || (o.material && o.material.emissiveIntensity > 0.3) || !o.visible;
 scene.children.slice().forEach(g => { if (g.isGroup && !dynamic.has(g) && !(world.overlays && world.overlays.includes(g))) mergeGroupStatic(g, skipMerge); });
-scene.traverse(o => { if (o.isLight || o === world.sun.target || dynamic.has(o)) return; o.matrixAutoUpdate = false; o.updateMatrix(); });
+scene.traverse(o => { if (o.userData.animated || o.isLight || o === world.sun.target || dynamic.has(o)) return; o.matrixAutoUpdate = false; o.updateMatrix(); });
 
 const player = createPlayer(camera, renderer.domElement);
 scene.add(camera);
@@ -50,7 +50,7 @@ const CAP = { baixa: 1, media: 1.5, alta: 2 };
 let resScale = 1; // multiplicador automatico (0.5 a 1)
 function applyResolution() {
   const cap = Math.min(dprNative, CAP[state.settings.quality] || 1.5);
-  renderer.setPixelRatio(Math.max(0.5, cap * resScale));
+  renderer.setPixelRatio(Math.min(matchMedia('(pointer: coarse)').matches ? 1.25 : Infinity, Math.max(0.5, cap * resScale)));
   renderer.setSize(innerWidth, innerHeight);
 }
 function applyQuality() {

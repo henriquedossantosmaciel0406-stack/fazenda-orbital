@@ -1,15 +1,14 @@
+import {rainField} from './weather.js';
 // Efeitos visuais: particulas em pool, chuva e meteorito. Nada e alocado dentro do loop.
 import * as THREE from 'three';
 
 const MAX_PARTICLES = 500;
-const RAIN_COUNT = 700;
 let scene, camera;
 let pPoints, pPos, pCol, pVel, pLife, pMax, pCursor = 0;
-let rain, rainPos, rainIntensity = 0, rainTarget = 0;
+let rain, rainIntensity = 0, rainTarget = 0;
 let meteor = null;
 const tmpColor = new THREE.Color();
 let particleScale = 1;
-let rainActiveCount = RAIN_COUNT;
 
 function makeDotTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 32;
@@ -40,29 +39,7 @@ export function initEffects(currentScene, currentCamera) {
   pPoints.frustumCulled = false;
   scene.add(pPoints);
 
-  // --- Chuva: quads em shader, queda por uniform de tempo (sem CPU, nunca congela) ---
-  const rGeo = new THREE.BufferGeometry();
-  const base = new Float32Array(RAIN_COUNT * 4 * 3), corner = new Float32Array(RAIN_COUNT * 4 * 2), idx = [];
-  for (let i = 0; i < RAIN_COUNT; i++) {
-    const x = (Math.random() - 0.5) * 50, y = Math.random() * 25, z = (Math.random() - 0.5) * 50;
-    for (let k = 0; k < 4; k++) { base.set([x, y, z], (i * 4 + k) * 3); corner.set([k < 2 ? -1 : 1, k % 2], (i * 4 + k) * 2); }
-    const v = i * 4; idx.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
-  }
-  rGeo.setAttribute('position', new THREE.BufferAttribute(base, 3));
-  rGeo.setAttribute('corner', new THREE.BufferAttribute(corner, 2));
-  rGeo.setIndex(idx);
-  rain = new THREE.Mesh(rGeo, new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false,
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uColor: { value: new THREE.Color(0xCFE8FF) } },
-    vertexShader: `attribute vec2 corner; uniform float uTime; varying float vE;
-      void main(){ vec3 p = position; p.y = mod(p.y - uTime * 26.0, 25.0); p.x += (25.0 - p.y) * 0.06;
-        vec4 mv = modelViewMatrix * vec4(p.x, p.y - corner.y * 1.3, p.z, 1.0);
-        mv.x += corner.x * 0.045; vE = (1.0 - corner.y * 0.7) * smoothstep(2.5, 7.0, -mv.z); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: `uniform vec3 uColor; uniform float uOpacity; varying float vE;
-      void main(){ gl_FragColor = vec4(uColor, uOpacity * vE); }`
-  }));
-  rain.frustumCulled = false; rain.visible = false; rain.userData.count = RAIN_COUNT;
-  scene.add(rain);
+  rain=rainField(scene);
 
   // --- Meteorito (um unico objeto reutilizado) ---
   meteor = new THREE.Group();
@@ -76,14 +53,12 @@ export function initEffects(currentScene, currentCamera) {
 export function setEffectsQuality(quality) {
   if (quality === 'baixa') {
     particleScale = 0.35;
-    rainActiveCount = 220;
   } else if (quality === 'alta') {
     particleScale = 1;
-    rainActiveCount = RAIN_COUNT;
   } else {
     particleScale = 0.7;
-    rainActiveCount = 450;
   }
+  rain?.quality(quality);
   if (pPoints) pPoints.material.size = quality === 'baixa' ? 0.28 : quality === 'alta' ? 0.38 : 0.34;
 }
 
@@ -143,13 +118,7 @@ export function updateEffects(dt) {
 
   // Chuva
   rainIntensity += (rainTarget - rainIntensity) * Math.min(1, dt * 1.5);
-  if (rainIntensity < 0.02) { rain.visible = false; }
-  else {
-    rain.visible = true; rain.material.uniforms.uOpacity.value = 0.7 * rainIntensity;
-    rain.material.uniforms.uTime.value += dt;
-    rain.position.set(camera.position.x, 0, camera.position.z);
-    rain.geometry.setDrawRange(0, rainActiveCount * 6);
-  }
+  rain.update(dt,rainIntensity,camera.position);
 
   // Meteorito
   const m = meteor.userData;
