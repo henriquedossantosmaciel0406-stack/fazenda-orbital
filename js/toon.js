@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // Rampa de 3 tons: sombra suave, meio-tom e luz cheia
-const ramp = new Uint8Array([160, 218, 255]);
+const ramp = new Uint8Array([122, 202, 255]);
 export const toonGradient = new THREE.DataTexture(ramp, 3, 1, THREE.RedFormat);
 toonGradient.minFilter = toonGradient.magFilter = THREE.NearestFilter;
 toonGradient.generateMipmaps = false;

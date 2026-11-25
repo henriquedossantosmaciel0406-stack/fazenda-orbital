@@ -38,7 +38,7 @@ export const state = {
   products: emptyProducts(),
   crystals: 0,
   saplings: emptyTrees(), fruits: emptyTrees(), mutated: {},
-  expedition: {completed:0,run:null}, adoptedPets: [], activePet: null,
+  adoptedPets: [], activePet: null,
   trees: [], nextTreeId: 1,
   land: { expand: 1, soil: 0, orchard: 0 }, hotbarPage: 0,
   level: 1, xp: 0, xpNeeded: 40,
@@ -58,13 +58,12 @@ export const state = {
 
 // ---------- Derivados ----------
 let special = false;
-export function enableOrbitalPass(pets, sectorCount) {
+export function enableOrbitalPass(pets) {
   if (special) return;
   special = true;
   state.level = Math.max(100, state.level);
   state.islandUnlocked = true;
   state.adoptedPets = [...pets];
-  state.expedition.completed = sectorCount;
   state.maxWater = Math.max(50,state.maxWater);
   state.water = state.maxWater;
   state.crystals = Math.max(9999,state.crystals);
@@ -149,7 +148,7 @@ export function setObjective(index) {
 // ---------- Salvamento ----------
 export function save() {
   const data = {
-    version: CONFIG.version, expedition:state.expedition, adoptedPets: state.adoptedPets, activePet: state.activePet,
+    version: CONFIG.version, adoptedPets: state.adoptedPets, activePet: state.activePet,
     money: state.money, water: state.water, maxWater: state.maxWater, energy: state.energy,
     speedLevel: state.speedLevel, yieldLevel: state.yieldLevel,
     seeds: state.seeds, crops: state.crops, products: state.products, crystals: state.crystals,
@@ -186,7 +185,7 @@ export function load() {
   }
   const keep = ['seeds', 'crops', 'products', 'research', 'contracts', 'stats', 'achievements', 'settings', 'saplings', 'fruits', 'mutated', 'land'];
   for (const key of Object.keys(data)) {
-    if (['plots', 'lettuceSeed', 'strawberrySeed', 'lettuce', 'strawberry', 'objective', 'version', 'objectiveProgress'].includes(key)) continue;
+    if (['expedition', 'plots', 'lettuceSeed', 'strawberrySeed', 'lettuce', 'strawberry', 'objective', 'version', 'objectiveProgress'].includes(key)) continue;
     if (keep.includes(key) && data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
       state[key] = { ...state[key], ...data[key] };
     } else {

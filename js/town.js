@@ -196,20 +196,6 @@ export function buildTown(scene,world) {
     for(const side of [-1,1])box(g,slate,side*0.74,0.30,0,0.17,0.51,0.48);
     world.colliders.push({x,z,halfX:1,halfZ:0.34});
   }
-  const port=new THREE.Group();port.name='Plataforma de lançamento';port.position.set(57,0,35);scene.add(port);
-  disk(port,slate,0,.29,0,3.6,.43,12);disk(port,trim,0,.54,0,3.03,.10,12);
-  for(let i=0;i<8;i++){const a=i*Math.PI/4;orb(port,honey,Math.sin(a)*3.1,.59,Math.cos(a)*3.1,.14,.08,.14);}
-  disk(port,beam,0,1.19,0,.79,1.12,16);
-  orb(port,trim,0,3.45,0,1.33,2.32,1.33);
-  part(port,geo('cone',1.04,1.65,16),terra,0,5.66,0);
-  for(let i=0;i<3;i++){const a=i*2.094;
-    const fin=part(port,geo('cone',.68,1.72,3),slate,Math.sin(a)*1.11,1.43,Math.cos(a)*1.11);fin.rotation.y=a;
-    const win=orb(port,wood,Math.sin(a)*1.19,3.83,Math.cos(a)*1.19,.48,.49,.15);win.rotation.y=a;
-    const pane=orb(port,0x6CD4D0,Math.sin(a)*1.31,3.83,Math.cos(a)*1.31,.36,.37,.07);pane.rotation.y=a;
-  }
-  world.colliders.push({x:57,z:35,radius:1.55});
-  world.portPosition=new THREE.Vector3(55,1.7,36);
-  const portLabel=makeLabel('PORTO ORBITAL','#FFE19F',4.8,.92);portLabel.position.set(0,7.22,0);port.add(portLabel);
   // Ponteiros se movem fora dos lotes estáticos da praça.
   for(const pair of moving)for(const p of pair){p.userData.animated=true;p.traverse(o=>o.userData.keep=true);}
   return time=>{orbit.rotation.y=time*Math.PI/2;for(const [hour,minute] of moving){hour.rotation.z=-time*Math.PI/6;minute.rotation.z=-time*Math.PI*2;}};

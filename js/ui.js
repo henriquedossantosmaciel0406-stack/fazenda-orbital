@@ -226,6 +226,16 @@ export function row(o) {
   head.append(el('b', null, o.title));
   if (o.tag) head.append(el('span', 'badge ' + (o.tagCls || ''), o.tag));
   info.append(head);
+  if(o.species){
+    r.classList.add('seed-packet');
+    r.style.setProperty('--species','#'+o.color.toString(16).padStart(6,'0'));
+    info.append(el('span','species',o.species));
+    const stats=el('dl','seed-stats');
+    for(const [label,value] of o.growing){
+      const stat=el('div');stat.append(el('dt',null,label),el('dd',null,String(value)));stats.append(stat);
+    }
+    info.append(stats);
+  }
   if (o.desc) info.append(el('small', null, o.desc));
   if (o.bar) info.append(progressBar(o.bar.frac, o.bar.cls, o.bar.text));
   r.append(info);
@@ -430,11 +440,17 @@ export function openSettings() {
       ['baixa', 'media', 'alta'].forEach(name => {
         const b = el('button', name === state.settings.quality ? 'active' : '', name.toUpperCase());
         b.type = 'button';
-        b.addEventListener('click', () => { state.settings.quality = name; onSettingsCb(); refreshModal(); });
+        b.textContent = {baixa:'Baixo',media:'Médio',alta:'Alto'}[name];
+        b.setAttribute('aria-pressed',String(name===state.settings.quality));
+        b.addEventListener('click', () => { state.settings.quality = name; onSettingsCb(); if(state.mode==='play') save(); refreshModal(); });
         opts.append(b);
       });
       q.append(opts);
-      body.append(q, el('p', 'hint', 'Baixa desliga sombras e reduz particulas. Media usa sombras leves e densidade moderada. Alta usa sombras nitidas e mais chuva e particulas.'));
+      body.append(q, el('p','hint',{
+        baixa:'Desempenho: resolução reduzida, céu simplificado, sem sombras ou contornos.',
+        media:'Equilibrado: nuvens, planeta, contornos e sombras de 1024 px.',
+        alta:'Detalhado: planeta com anéis, 500 estrelas à noite, sombras suaves de 2048 px e mais partículas.'
+      }[state.settings.quality]));
       body.append(menuButton('Voltar', back, 'secondary'));
     }
   });

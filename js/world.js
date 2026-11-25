@@ -557,6 +557,16 @@ export function createWorld(scene) {
   sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
   const stars = new THREE.Points(sGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, transparent: true, opacity: 0, fog: false, depthWrite: false }));
   stars.frustumCulled = false; scene.add(stars); world.stars = stars;
+  // Um planeta de duas cores acima da colônia, com anéis no perfil alto.
+  const planet=new THREE.Group();
+  const celestial = color => new THREE.MeshBasicMaterial({color,fog:false});
+  planet.position.set(175,120,150);
+  planet.add(new THREE.Mesh(geo('sph',16,32,20),celestial(0xb992e3)));
+  const rings=new THREE.Group();
+  for(const [radius,width,color] of [[22,1.8,0xffdb96],[25,.55,0xffefbd]]){
+    const ring=new THREE.Mesh(geo('tor',radius,width,8,64),celestial(color));rings.add(ring);
+  }
+  rings.rotation.set(1.12,.18,-.48);planet.add(rings);scene.add(planet);world.skyPlanet=planet;
 
   // --- Sobreposicoes do modo construcao ---
   const farmOverlay = M(geo('plane', farm.x1 - farm.x0, farm.z1 - farm.z0), new THREE.MeshBasicMaterial({ color: 0x4FE3C1, transparent: true, opacity: 0.1, depthWrite: false }));

@@ -315,10 +315,21 @@ button.pack-card{cursor:pointer}.pack-card:hover{border-color:#558b71}.pack-card
 #recoveryNotice{background:#fff0c5;color:#453a2b;border-radius:12px;padding:10px;font-size:13px}#recoveryNotice code{display:block;user-select:all;font-size:12px}#recoveryNotice .link{color:#275a4c!important}
 #syncStatus{position:absolute;top:4px;left:50%;transform:translateX(-50%);max-width:85vw;color:#341c10;background:#ffe3ad;z-index:40;font-size:13px;padding:6px 12px;border-radius:10px}
 @media(max-width:550px){#hotbar{gap:2px}.slot{width:min(9.2vw,43px);height:min(10vw,44px)}#hotbarWrap{transform:translateX(-50%)}#modal.wide{padding:12px}}
-.star-map{width:100%;height:auto;max-height:42vh;object-fit:contain;background:#1c3049;border:2px solid #3d514d;border-radius:13px;display:block}
-.mission-heading{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}.mission-heading h4,.route-card h4{margin:0;font-size:20px;color:#29574e}
-.ship-status{font-size:13px;font-weight:700}.mission-heading{margin:3px 0 8px}.space-mission,.flight-log,.route-card p{margin:5px 0;line-height:1.25}
-.flight-log{color:#6e431d;min-height:1.2em}.space-btn{font:inherit;font-weight:700;padding:6px 12px}.space-btn:disabled{background:#d1ccb9;color:#514f44;box-shadow:none;cursor:default}
-.orbital-routes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:10px}.route-card{padding:12px;background:#fffaed;border:1px solid #c9bf9e;border-radius:12px}.route-card small{display:block;margin:7px 0}
-.mission-controls,.pilot-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.mission-controls{justify-content:space-between}.space-pad{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:25px 25px;gap:3px}.space-pad button{padding:0}.space-pad [data-dir=north]{grid-column:2}.space-pad [data-dir=west]{grid-column:1}.flight-help{display:block;margin-top:6px;color:#4f6455}
+/* Painéis da colônia: tinta escura, bordas desenhadas e faixas de luz. */
+#menu,#login{background:radial-gradient(ellipse at 16% 15%,#8964c75c,transparent 48%),radial-gradient(ellipse at 87% 80%,#388f9666,transparent 42%),#15172a88}
+#menu .menu-card,#login .menu-card,#modal:not([data-view="inventory"]):not([data-view="shop"]){background:linear-gradient(145deg,#30365c,#25213f 65%);color:#fff3d4;border:3px solid #17172f;border-top-color:#aaa3eb;border-radius:24px;box-shadow:0 6px 0 #141329,0 18px 46px #14112769}
+.menu-card h1{color:#fff2bb;text-shadow:2px 3px #59376d,0 5px #18162b}
+#menu .menu-card button:not(.link),#login #authSubmit{border:2px solid #252541;border-radius:14px;box-shadow:0 3px 0 #17192e}
+#menu #startBtn,#authSubmit{background:linear-gradient(#acffe1,#60d5bd);color:#123a40}
+.hud-card,#hotbar .slot{border-color:#352c50;box-shadow:0 3px 0 #24223a}
+#hotbar .slot.active{outline:2px solid #ffdc80}
+#modal:is([data-view="shop"],[data-view="inventory"]){--catalog:#385589;--tint:#ddedf1;background:#f2f2e6;border-color:#394368;box-shadow:0 6px 0 #212544,0 18px 40px #161a3055}
+#modal[data-market="true"]{--catalog:#975336}
+#modal[data-view="shop"] .shop-item.seed-packet{border:2px solid #455775;border-top:7px solid var(--species);box-shadow:0 3px 0 #b3bac4;align-items:start}
+.seed-packet .product-image{background:radial-gradient(circle,#fff9db 35%,var(--species));border-radius:50% 50% 40% 40%;border:2px solid #32354b}
+.seed-packet .product-image img{width:clamp(44px,7vw,72px);height:auto}
+.species{font-size:.82rem;font-weight:bold;color:#41545c}
+.seed-stats{display:flex;gap:.7rem;flex-wrap:wrap;margin:.4rem 0;color:#26374b}
+.seed-stats dt{font-size:.68rem;color:#455869}.seed-stats dd{font-size:.88rem;font-weight:800;margin:0}
+button:focus-visible,input:focus-visible{outline:3px solid #ffca67;outline-offset:2px}
 #modal:is([data-view="shop"],[data-view="inventory"]) .shop-item{animation:none}

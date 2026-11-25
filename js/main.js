@@ -4,7 +4,6 @@ import { createWorld } from './world.js';
 import { createPlayer } from './player.js';
 import {enableOrbitalPass} from './state.js';
 import {PETS} from './actors.js';
-import {sectors} from './space-rules.js';
 import { initGame, updateGame } from './game.js';
 import { state, load, save, setSaveKey } from './state.js';
 import { saveKeyFor } from './accounts.js';
@@ -32,7 +31,7 @@ const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 70
 const session = await showLogin();
 setSaveKey(saveKeyFor(session.nick));
 const hasSave = load(); // o save e lido ANTES de criar o jogo, para restaurar canteiros sem duplicar
-if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS), sectors.length);
+if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS));
 const world = createWorld(scene);
 
 // Congela as matrizes do cenario fixo: o Three.js deixa de recalcula-las a cada quadro.
@@ -50,11 +49,17 @@ initNet(scene, camera, () => session.nick, world);
 restoreEventVisuals();
 
 // ---------- Qualidade e resolucao dinamica ----------
-const CAP = { baixa: 1, media: 1.5, alta: 2 };
+const profiles = {
+  baixa: {pixels:0.75, mobile:0.75, shadow:0, stars:80, clouds:false, planet:false},
+  media: {pixels:1.25, mobile:1.15, shadow:1024, stars:280, clouds:true, planet:true},
+  alta: {pixels:2, mobile:1.65, shadow:2048, stars:500, clouds:true, planet:true}
+};
+const profile = () => profiles[state.settings.quality] || profiles.media;
 let resScale = 1; // multiplicador automatico (0.5 a 1)
 function applyResolution() {
-  const cap = Math.min(dprNative, CAP[state.settings.quality] || 1.5);
-  renderer.setPixelRatio(Math.min(matchMedia('(pointer: coarse)').matches ? 1.25 : Infinity, Math.max(0.5, cap * resScale)));
+  const preset = profile();
+  const cap = matchMedia('(pointer: coarse)').matches ? preset.mobile : preset.pixels;
+  renderer.setPixelRatio(Math.max(0.5, Math.min(dprNative * (state.settings.quality==='alta'?1.35:1),cap) * resScale));
   renderer.setSize(innerWidth, innerHeight);
 }
 function applyQuality() {
@@ -62,8 +67,14 @@ function applyQuality() {
   setEffectsQuality(q);
   setOutlines(q !== 'baixa');
   const sun = world.sun;
-  sun.castShadow = q !== 'baixa';
-  const size = q === 'alta' ? 2048 : 1024;
+  const preset=profile();
+  renderer.shadowMap.enabled = sun.castShadow = !!preset.shadow;
+  renderer.shadowMap.type = q==='alta' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  world.clouds.visible=preset.clouds;
+  world.skyPlanet.visible=preset.planet;
+  world.skyPlanet.children[1].visible=q==='alta';
+  world.stars.geometry.setDrawRange(0,preset.stars);
+  const size = preset.shadow || 512;
   if (sun.shadow.mapSize.x !== size) {
     sun.shadow.mapSize.set(size, size);
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
@@ -72,6 +83,10 @@ function applyQuality() {
   applyResolution();
   renderer.shadowMap.needsUpdate = true;
 }
+try {
+  const deviceQuality=localStorage.getItem('orbital-graphics');
+  if(Object.hasOwn(profiles,deviceQuality)) state.settings.quality=deviceQuality;
+} catch {}
 applyQuality();
 
 setLockHandler(() => player.lock());
@@ -87,7 +102,10 @@ bindUI({
     if (document.pointerLockElement) document.exitPointerLock();
     showMainMenu(true);
   },
-  onSettings: applyQuality
+  onSettings: () => {
+    applyQuality();
+    try { localStorage.setItem('orbital-graphics',state.settings.quality); } catch {}
+  }
 });
 document.querySelectorAll('[data-icon]').forEach(e => { e.innerHTML = icon(e.dataset.icon); });
 showMainMenu(hasSave);

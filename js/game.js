@@ -1,4 +1,3 @@
-import {openExpedition} from './expedition.js';
 import {CANS,canLevel,canEfficiency} from './gear.js';
 import {makeFarmer,animateFarmer,companion} from './actors.js';
 import {createWateringCan} from './watering-can.js';
@@ -760,7 +759,9 @@ function openGeneralStore() {
       const c = CONFIG.crops[k], locked = state.level < c.level;
       return {
         thumb:k, color: c.color, title: 'Semente de ' + c.name,
-        desc: 'Custo ' + c.seedCost + ' CR  |  Cresce em ' + c.growTime + 's  |  Vende por ' + c.sellPrice + ' CR  |  Agua ' + c.waterUse,
+        species: {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática'}[k],
+        growing: [['Colheita',c.growTime+' s'],['Água',c.waterUse],['Venda',c.sellPrice+' CR']],
+        desc: 'Pacote de sementes · '+c.seedCost+' CR por unidade',
         tag: locked ? 'NIVEL ' + c.level : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,
         buttons: [
           { label: 'Comprar 1', disabled: locked || state.money < c.seedCost, onClick: () => buySeed(k, 1) },
@@ -1027,7 +1028,6 @@ function findTarget() {
   const c = camera.position;
   if (flat(c, world.shopPosition.x, world.shopPosition.z) < 5.5) target.type = 'shop';
   else if (flat(c, world.marketPosition.x, world.marketPosition.z) < 5.5) target.type = 'market';
-  else if (flat(c,world.portPosition.x,world.portPosition.z)<4.6) target.type='space';
   else if (flat(c, world.pumpPosition.x, world.pumpPosition.z) < 3.4) target.type = 'pump';
   else if (flat(c, world.stationPosition.x, world.stationPosition.z) < 5) target.type = 'station';
   else if (!state.islandUnlocked && flat(c, world.gatePosition.x, world.gatePosition.z) < 8) target.type = 'gate';
@@ -1053,7 +1053,6 @@ function promptFor() {
     case 'structure': return 'E - ' + target.ref.def.name + (target.ref.def.kind === 'building' ? ' (nivel ' + target.ref.data.level + ')' : '');
     case 'pickup': return 'E - Coletar meteorito de sementes';
     case 'crystal': return 'E - Coletar cristal';
-    case 'space': return 'E - Porto orbital · nível 12';
     case 'shop': return 'E - Abrir Loja Geral';
     case 'market': return 'E - Abrir Mercado';
     case 'pump': return 'E - Encher regador';
@@ -1072,7 +1071,6 @@ function interact() {
     case 'structure': openStructurePanel(r); break;
     case 'pickup': collectPickup(r); break;
     case 'crystal': mineCrystal(r); break;
-    case 'space': openExpedition(); break;
     case 'shop': openGeneralStore(); break;
     case 'market': openMarket(); break;
     case 'pump': useWaterPump(); break;
