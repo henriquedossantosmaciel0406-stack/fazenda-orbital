@@ -433,15 +433,24 @@ let adminSession=false;
 function openAdmin(){
   const hours={dawn:6,noon:12,sunset:18,night:22};
   const groups=[
-    ['Clima e eventos',[['clear','Abrir o céu'],...['rain','tempest','aurora','rainbow','festival','meteor'].map(id=>[id,CONFIG.events[id].name])]],
+    ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow'].map(id=>[id,CONFIG.events[id].name])]],
     ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
+    ['Eventos da fazenda',['festival','boom','urgent','merchant','meteor'].map(id=>[id,CONFIG.events[id].name])],
     ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia']]]
   ];
   let pending=false;
-  openModal({id:'admin',title:'Observatório · ADM',hint:'Quem cria a sala controla o clima e a hora. O pomar e os recursos são da sua conta.',build(body){
+  openModal({id:'admin',wide:true,title:'Observatório · ADM',hint:'Quem cria a sala controla o clima e a hora. O pomar e os recursos são da sua conta.',build(body){
+    const sky=state.event;
+    const status=el('div','admin-status');
+    status.append(el('strong','',sky ? CONFIG.events[sky.id]?.name : 'Céu aberto'),
+      el('span','',sky ? Math.ceil(sky.left)+' s restantes' : 'Sem evento climático'),
+      el('span','','Dia '+state.day+' · '+String(Math.floor(state.time)).padStart(2,'0')+'h'));
+    body.append(status);
+    const grid=el('div','admin-grid');body.append(grid);
     for(const [name,commands] of groups){
-      body.append(section(name));
-      const list=el('div','menu-list');body.append(list);
+      const card=el('section','admin-card');grid.append(card);
+      card.append(section(name));
+      const list=el('div','menu-list');card.append(list);
       for(const [id,label] of commands){
         const isEvent=Object.hasOwn(CONFIG.events,id);
         list.append(menuButton(label,async()=>{
@@ -449,7 +458,7 @@ function openAdmin(){
           pending=true;
           try{
             const {netInfo}=await import('./net.js');
-            const local=['orchard','refill','meteor'].includes(id);
+            const local=['orchard','refill','meteor','boom','urgent','merchant'].includes(id);
             if(!local && netInfo().mode==='guest'){showToast('Crie a sala para controlar o céu.','info');return;}
             const result=await api('admin',isEvent?{event:id}:{command:id});
             if(!result.ok){showToast(result.error,'bad');return;}
@@ -469,7 +478,7 @@ function openAdmin(){
             }
             closeModal();save();
             if(!result.event)showToast(label+' · concluído','good');
-          }finally{pending=false;}
+          }catch{showToast('Falha ao enviar o comando. Tente de novo.','bad');}finally{pending=false;}
         }));
       }
     }

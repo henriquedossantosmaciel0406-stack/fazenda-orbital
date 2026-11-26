@@ -102,15 +102,21 @@ function vaporMap(){
 export function cloudField(scene){
   const group=new THREE.Group();scene.add(group);
   const uniforms={vapor:{value:vaporMap()},wind:{value:new THREE.Vector2()},evolution:{value:0},
-    cover:{value:0},sunDir:{value:new THREE.Vector2()},lit:{value:new THREE.Color()},base:{value:new THREE.Color()}};
+    cover:{value:0},squall:{value:0},lowDetail:{value:false},sunDir:{value:new THREE.Vector2()},lit:{value:new THREE.Color()},base:{value:new THREE.Color()}};
   const density=`
-    uniform sampler2D vapor;uniform vec2 wind,sunDir;uniform float cover,evolution;
+    uniform sampler2D vapor;uniform vec2 wind,sunDir;uniform float cover,evolution,squall;
+    uniform bool lowDetail;
+    float front(vec2 uv){
+      return .5+.5*sin(uv.x*9.+uv.y*4.+2.*sin(uv.y*8.+evolution*4.));
+    }
     float density(vec2 p){
       vec2 uv=p*.0036+wind;
+      float bank=front(uv)*squall;
+      if(lowDetail)return texture2D(vapor,uv).r+cover*.12+bank*.09;
       vec2 curl=texture2D(vapor,uv*.57+vec2(evolution,0.)).rg-.5;
-      vec2 field=texture2D(vapor,uv+curl*.26).rg;
+      vec2 field=texture2D(vapor,uv+curl*(.26+.48*squall)+vec2(.085*bank,0.)).rg;
       float wisps=texture2D(vapor,uv*2.83-curl*.32-wind*.44).g;
-      return field.r*.68+field.g*.21+wisps*.11+cover*.105;
+      return field.r*.68+field.g*.21+wisps*.11+cover*.12+bank*.09;
     }`;
   const surface=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,
     vertexShader:`varying vec3 wp;void main(){wp=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.);}`,
@@ -121,10 +127,12 @@ export function cloudField(scene){
         float haze=1.-smoothstep(270.,510.,distance(wp.xz,cameraPosition.xz));
         float a=smoothstep(.425,.575,d)*haze;
         if(a<.007)discard;
-        float upstream=density(wp.xz+sunDir*6.);
+        float upstream=lowDetail ? d : density(wp.xz+sunDir*8.);
         float edge=1.-smoothstep(.47,.63,d);
         float relief=clamp(.48+4.5*(d-upstream)+.54*edge,0.,1.);
         vec3 ink=mix(base,lit,mix(relief,smoothstep(.24,.8,relief),.24));
+        float shelf=front(wp.xz*.0036+wind);
+        ink*=1.-squall*(.20+.38*shelf)*smoothstep(.45,.7,d);
         gl_FragColor=vec4(ink,a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -155,23 +163,27 @@ export function cloudField(scene){
   curtain.position.set(0,59,-14);curtain.visible=false;group.add(curtain);
   const shade=new THREE.Color(0xa2afcb),stormShade=new THREE.Color(0x565f79);
   const day=new THREE.Color(0xfffbef),night=new THREE.Color(0x7987aa),dusk=new THREE.Color(0xffc29c);
-  let amount=0;
+  let amount=0, gustTime=0;
   function update(dt,time,event,viewer){
-    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.5 : 0;
+    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.85 : event==='rainbow' ? -.32 : 0;
     amount+=(target-amount)*(1-Math.exp(-dt*.23));
-    if(!group.visible)return;
+    const gust=uniforms.squall;
+    gust.value+=((event==='tempest'?1:0)-gust.value)*(1-Math.exp(-dt*.34));
+    gustTime+=dt;
     curtain.visible=event==='aurora';
     if(curtain.visible)curtain.material.uniforms.phase.value+=dt*.36;
     const a=time*Math.PI/12, daylight=THREE.MathUtils.smoothstep(-Math.cos(a),-.18,.25);
     const sunset=1-THREE.MathUtils.smoothstep(Math.abs(Math.cos(a)),0,.38);
     uniforms.cover.value=amount;
-    uniforms.wind.value.x+=dt*.0019*(1+amount);
-    uniforms.evolution.value+=dt*.00065;
+    const speed=.0026+Math.max(amount,0)*.004+gust.value*(.009+.004*Math.sin(gustTime*.85));
+    uniforms.wind.value.x-=dt*speed;
+    uniforms.wind.value.y-=dt*speed*(.24+gust.value*.22*Math.sin(gustTime*.52));
+    uniforms.evolution.value+=dt*(.002+gust.value*.019);
     uniforms.sunDir.value.set(Math.cos(a),Math.sin(a));
     uniforms.lit.value.copy(night).lerp(day,daylight).lerp(dusk,sunset*.72).lerp(shade,Math.max(0,amount)*.63);
     uniforms.base.value.copy(night).lerp(shade,daylight).lerp(stormShade,Math.max(0,amount));
     veil.position.set(viewer?.x??0,63-amount*19,viewer?.z??0);veil.updateMatrix();
   }
-  function quality(level){group.visible=level!=='baixa';veil.castShadow=level==='alta';}
+  function quality(level){uniforms.lowDetail.value=level==='baixa';veil.castShadow=level==='alta';}
   update(0,10,null);return {group,update,quality};
 }
