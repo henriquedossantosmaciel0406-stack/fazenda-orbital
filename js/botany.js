@@ -52,6 +52,25 @@ function tools(parent,kind='blade') {
   return {part,leaf,rod,oval,gem};
 }
 
+// Folha de alface em concha com nervura central e borda crespa.
+function lettuceLeaf(){
+  const pos=[],idx=[];
+  for(let j=0;j<=10;j++)for(let k=0;k<=8;k++){
+    const t=j/10,u=k/4-1,edge=Math.abs(u),bell=Math.sin(Math.PI*t*.96);
+    const ripple=.038*Math.sin(22*t+u*7)*edge**3*t;
+    pos.push(u*(.025+.46*bell**.67)*(.9+.10*Math.sin(18*t)*edge),
+      .10*t+.51*t*t+.12*u*u*bell+.044*bell*(1-edge)**6+ripple,
+      .74*t-.23*t**3-.17*u*u*bell);
+    if(j<10&&k<8){const a=j*9+k;idx.push(a,a+9,a+1,a+1,a+9,a+10);}
+  }
+  const topCount=pos.length/3,topIndices=idx.slice();
+  for(let i=0;i<topCount;i++)pos.push(pos[i*3],pos[i*3+1]-.012,pos[i*3+2]);
+  for(let i=0;i<topIndices.length;i+=3)idx.push(topCount+topIndices[i+2],topCount+topIndices[i+1],topCount+topIndices[i]);
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();return g;
+}
+const lettuceBlade=lettuceLeaf();
+
 export function fillCrop(P,key,g,ready,sick,mutation) {
   const group = new THREE.Group(); P.add(group);
   const leafKind=['flower','lotus'].includes(key)?'petal':['lettuce','strawberry','grape','pumpkin','melon','tomato'].includes(key)?'lobed':'blade';
@@ -69,7 +88,14 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
     ring(x,y,z,5,r,r*0.33,0.2,color); oval(x,y+0.025,z,r*0.22,r*0.18,r*0.22,0xFFD077);
   }
   if (key==='lettuce') {
-    for(let j=0;j<3;j++) ring(0,0.08+j*0.11,0,9-j,1.1-j*0.22,0.32-j*0.035,0.17+j*0.43,blend(col,0xe4ff97,j*0.28),j*0.51);
+    const leaves=5+Math.floor(g*13);
+    for(let i=0;i<leaves;i++){
+      const layer=i/(leaves-1),angle=i*spiral;
+      const span=1.48-layer*.96,offset=.27*(1-layer);
+      const tint=blend(col,sick?0xc4ad69:0xdaf396,.12+layer*.67);
+      const m=part(lettuceBlade,tint,Math.sin(angle)*offset,.06+layer*.35,Math.cos(angle)*offset,span,span,span);
+      m.rotation.set(.55-layer*1.15,angle,0,'YXZ');
+    }
   } else if (key==='carrot') {
     for(let j=0;j<3;j++) {
       const x=(j-1)*0.58,z=j%2*0.34-0.18;

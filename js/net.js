@@ -1,4 +1,6 @@
 import {makeFarmer,animateFarmer,companion,PETS} from './actors.js';
+import {canModel} from './watering-can.js';
+import {canLevel,CANS} from './gear.js';
 import {varySpecimen} from './botany.js';
 import { waterJet } from './water.js';
 // Multiplayer por codigo: um jogador cria a sala (host), os amigos entram pelo codigo.
@@ -6,7 +8,7 @@ import { waterJet } from './water.js';
 // Transporte: WebRTC (PeerJS) por padrao; com ?net=local usa BroadcastChannel (duas abas do mesmo navegador, para testes).
 import { relayAddress, fixedRelay, setRelayAddress, connectRelay } from './relay.js';
 import * as THREE from 'three';
-import { state, bus, save, stockFree } from './state.js';
+import { state, bus, save, stockFree, HOTBAR } from './state.js';
 import { CONFIG } from './config.js';
 import { geo, mat, glow, makeLabel, createStructureModel, applyStructureLevel, animateStructure } from './world.js';
 import { addOutline } from './toon.js';
@@ -331,6 +333,16 @@ function handle(fromId, m) {
   if (m.t === 'pos') {
     const owner = m.farm ? N.remotes.get(m.farm) : null;
     const off = owner ? SLOT_OFFSET[owner.slot] : null;
+    const level=Number.isInteger(m.can)&&m.can>=1&&m.can<=CANS.length?m.can:0;
+    if(level!==(r.canLevel||0)){
+      const arm=r.avatar.userData.pose.arms[1];
+      if(r.can)arm.remove(r.can);
+      r.canLevel=level;r.can=level?canModel(level):null;
+      if(r.can){
+        r.can.scale.setScalar(.58);r.can.position.set(-.14,-.37,.09);
+        r.can.rotation.y=Math.PI;arm.add(r.can);
+      }
+    }
     r.petType=Object.hasOwn(PETS,m.pet)?m.pet:null;
     r.target.set(m.x + (off?.x || 0), Number.isFinite(m.jump)?Math.min(2,Math.max(0,m.jump)):0, m.z + (off?.z || 0)); r.yaw = m.r;
     r.receivedAt=N.clock;
@@ -671,15 +683,16 @@ export function updateNet(dt) {
     const jump=+Math.max(0,camera.position.y-CONFIG.player.height).toFixed(2);
     x=+x.toFixed(2);z=+z.toFixed(2);
     const yaw=+r.toFixed(3),pet=state.activePet;
-    const moved=x!==N.last.x||z!==N.last.z||yaw!==N.last.r||jump!==N.last.jump||farm!==N.last.farm||pet!==N.last.pet;
+    const can=HOTBAR[state.selectedSlot]?.type==='can'?canLevel(state):0;
+    const moved=can!==N.last.can||x!==N.last.x||z!==N.last.z||yaw!==N.last.r||jump!==N.last.jump||farm!==N.last.farm||pet!==N.last.pet;
     const elapsed=N.clock-(N.last.sent??N.clock);
     const continuous=farm===N.last.farm && elapsed>0 && Math.hypot(x-N.last.x,z-N.last.z)<=16*elapsed;
     const vx=continuous?+((x-N.last.x)/elapsed).toFixed(1):0;
     const vz=continuous?+((z-N.last.z)/elapsed).toFixed(1):0;
     const stopped=!moved && (N.last.vx||N.last.vz);
     if(moved || stopped || N.clock-(N.last.sent??-Infinity)>=1){
-      send({t:'pos',jump,pet,id:N.myId,farm,x,z,vx,vz,r:yaw});
-      N.last={x,z,vx,vz,r:yaw,jump,farm,pet,sent:N.clock};
+      send({t:'pos',jump,pet,can,id:N.myId,farm,x,z,vx,vz,r:yaw});
+      N.last={x,z,vx,vz,can,r:yaw,jump,farm,pet,sent:N.clock};
     }
     N.tPos=play_?0.07:0.25;
   }
@@ -698,6 +711,7 @@ export function updateNet(dt) {
     const sp = r.pos.distanceTo(predicted);
     r.walk = THREE.MathUtils.lerp(r.walk || 0, sp > 0.05 ? 1 : 0, k);
     animateFarmer(r.avatar,N.clock,r.walk,r.pos.y);
+    if(r.can)r.avatar.userData.pose.arms[1].rotation.x=-.83;
     r.pet.update(r.petType,r.pos,dt,N.clock,world);
     const turn=r.yaw+Math.PI-r.avatar.rotation.y;
     r.avatar.rotation.y+=Math.atan2(Math.sin(turn),Math.cos(turn))*k;

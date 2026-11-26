@@ -17,6 +17,12 @@
 .touch #hotbarWrap{max-width:98vw}
 .touch #hotbar{overflow-x:auto;max-width:96vw}
 .touch .menu-card{max-height:92dvh;overflow:auto}
+.touch #movePad {width:104px;height:104px;left:max(13px,env(safe-area-inset-left));bottom:max(78px,15vh);background:#192e46ad}
+.touch #movePad span {width:40px;height:40px;border-radius:50%;border:2px solid #c0f2e3;background:#598f89;pointer-events:none;transform:translate(var(--stick-x,0px),var(--stick-y,0px))}
+.touch #touchActions {grid-template-columns:repeat(2,minmax(54px,1fr));gap:5px;bottom:max(77px,15vh);right:max(9px,env(safe-area-inset-right))}
+.touch #touchActions button {touch-action:manipulation;min-height:44px}
+.touch #touchActions [data-key="KeyR"] {background:#276b78}
+@media(max-height:480px){.touch #touchActions,.touch #movePad{bottom:58px}.touch #movePad{width:90px;height:90px}}
 </style>
 </head>
 <body>
@@ -31,8 +37,8 @@
 
 <output hidden id="syncStatus" role="status"></output>
 <div id="hud" class="hidden">
-  <div id="movePad" aria-label="Direcional de movimento">✥</div>
-  <div id="touchActions"><button data-key="KeyE">Usar</button><button data-key="Space">Pular</button><button data-key="KeyI">Mochila</button><button data-key="KeyP">Menu</button></div>
+  <div id="movePad" aria-label="Direcional de movimento"><span aria-hidden="true"></span></div>
+  <div id="touchActions"><button data-key="KeyE">Usar</button><button data-key="KeyR">Regar</button><button data-key="Space">Pular</button><button data-key="KeyI">Mochila</button><button data-key="KeyP">Menu</button></div>
   <div id="crosshair"></div>
   <div id="flash" class="flash"></div>
 

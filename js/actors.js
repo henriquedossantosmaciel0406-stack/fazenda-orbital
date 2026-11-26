@@ -76,41 +76,74 @@ export function animateFarmer(root,t,walk,air=0){
 }
 
 export const PETS={
-  cat:{name:'Gato malhado',cost:0,desc:'Cauda listrada e passos curtos.'},
-  dog:{name:'Corgi caramelo',cost:160,desc:'Orelhas grandes e cauda que abana.'},
-  rabbit:{name:'Coelho da lua',cost:240,desc:'Acompanha você aos saltinhos.'}
+  cat:{name:'Gato malhado',cost:0,desc:'Gato de botas claras e cauda em gancho.'},
+  dog:{name:'Corgi caramelo',cost:160,desc:'Patinhas curtas e lenço de explorador.'},
+  rabbit:{name:'Coelho da lua',cost:240,desc:'Orelha caída e patas largas para saltar.'},
+  fox:{name:'Raposa cometa',cost:520,desc:'Enquanto acompanha você, aumenta sua velocidade em 15%.'},
+  turtle:{name:'Tartaruga de musgo',cost:680,desc:'Enquanto acompanha você, cultivos e árvores crescem 20% mais rápido.'},
+  axolotl:{name:'Axolote de orvalho',cost:840,desc:'Enquanto acompanha você, cada unidade de água da sua rega rende 30% mais.'}
 };
+const coats={cat:0x74758c,dog:0xde9b52,rabbit:0xcebadc,fox:0xd76b41,turtle:0x88bb83,axolotl:0xf4aabb};
 export function makePet(type){
-  const root=new THREE.Group(),body=pivot(root,0,0,0),head=pivot(body,0,0.475,0.29);
-  const fur=type==='cat'?0xC68A58:type==='dog'?0xCB8644:0xDFDAD0;
-  const bunny=type==='rabbit',cat=type==='cat';
-  const core=pivot(body,0,0,0);
-  oval(core,fur,0,0.33,-0.04,0.218,0.235,bunny?0.235:0.34);
-  oval(core,cream,0,0.30,0.18,0.159,0.177,0.145);
-  oval(head,fur,0,0.1,0,0.236,0.205,0.2);
-  for(const side of [-1,1]){
-    if(bunny) {
-      oval(head,fur,side*0.10,0.386,-0.045,0.067,0.214,0.061).rotation.z=-side*0.16;
-      oval(head,0xE8AD93,side*0.10,0.391,0.001,0.033,0.15,0.024).rotation.z=-side*0.16;
-    }else{
-      const ear=piece(head,geo('cone',1,1,4),fur,side*0.155,cat?0.286:0.32,-0.03,0.11,cat?0.225:0.32,0.097);ear.rotation.z=-side*0.19;
-      piece(head,geo('cone',1,1,4),0xB46955,side*0.161,ear.position.y,0.028,0.060,cat?0.132:0.204,0.052).rotation.z=ear.rotation.z;
+  const root=new THREE.Group(),body=pivot(root,0,0,0),core=pivot(body,0,0,0);
+  const bunny=type==='rabbit',low=type==='turtle'||type==='axolotl',fur=coats[type];
+  const head=pivot(body,0,low?.28:bunny?.55:.49,low?.37:.27);
+  const tail=pivot(body,0,low?.27:.35,-.30),legs=[];
+  function tip(g,c,x,y,z,w,h,d,tilt=0){
+    const m=piece(g,geo('cone',1,1,8),c,x,y,z,w,h,d);m.rotation.z=tilt;return m;
+  }
+  oval(core,fur,0,low?.26:.34,-.06,low?.26:.22,bunny?.29:low?.15:.22,type==='dog'?.40:.32);
+  oval(head,fur,0,.08,0,low?.25:.23,.20,low?.24:.19);
+  if(type==='turtle'){
+    oval(core,0x427e6a,0,.42,-.08,.32,.22,.38);
+    for(let i=0;i<6;i++){
+      const a=i*Math.PI/3;oval(core,i%2?0x9cbc72:0x75a67f,.18*Math.cos(a),.54,-.08+.22*Math.sin(a),.105,.065,.12);
     }
-    oval(head,cream,side*0.052,0.045,0.167,0.073,0.057,0.061);
+    tip(core,0xb4d87c,0,.69,-.1,.085,.20,.06,-.36);
+    tip(tail,fur,0,-.03,-.12,.07,.23,.07).rotation.x=-2.05;
+  }else if(type==='axolotl'){
+    for(const side of [-1,1])for(let i=0;i<3;i++){
+      const stalk=pivot(head,side*.19,.035+i*.072,-.04);
+      stalk.rotation.z=-side*(1.38-i*.33);
+      oval(stalk,0xe15b8b,0,.101,0,.037,.14,.044);
+      for(const sign of [-1,1])oval(stalk,0xff93b5,sign*.028,.15,0,.025,.057,.025).rotation.z=-sign*.62;
+    }
+    oval(tail,0xe77d9d,0,.018,-.18,.06,.135,.24);
+  }else{
+    for(const side of [-1,1]){
+      if(bunny){
+        const ear=pivot(head,side*.105,.22,0);
+        ear.rotation.z=side*(side<0?.22:1.02);
+        oval(ear,fur,0,.21,0,.078,.24,.061);oval(ear,0xe99baf,0,.22,.046,.042,.16,.022);
+      }else{
+        const size=type==='fox'?.27:type==='dog'?.21:.17;
+        tip(head,fur,side*.15,.274,-.014,.116,size,.095,-side*.18);
+        tip(head,0x875364,side*.15,.276,.048,.064,size*.61,.042,-side*.18);
+      }
+    }
+    oval(head,cream,0,.022,.145,.143,.089,type==='fox'?.15:.097);
+    oval(head,ink,0,.056,type==='fox'?.283:.229,.043,.026,.029);
+    if(type==='fox'){
+      oval(tail,fur,0,.13,-.18,.14,.145,.29).rotation.x=.47;
+      oval(tail,cream,0,.225,-.38,.103,.106,.16).rotation.x=.47;
+    }else if(type==='cat'){
+      for(let i=0;i<5;i++)oval(tail,i%2?0x454758:fur,.05*i,.06+i*.088,-.05-.055*Math.sin(i),.067,.095,.068);
+      for(let i=-1;i<=1;i++)oval(head,0x4f5162,i*.062,.218,.128,.018,.051,.024);
+    }else if(bunny)oval(tail,cream,0,.015,-.08,.12,.123,.12);
+    else{
+      oval(core,0x34758c,0,.49,.13,.228,.083,.19);
+      tip(core,0x34758c,0,.38,.27,.10,.16,.045).rotation.x=Math.PI;
+      oval(tail,cream,0,.06,-.085,.09,.104,.12);
+    }
   }
-  eyes(head,0.133,0.165,0.101,0.039);oval(head,ink,0,0.074,0.224,0.030,0.020,0.021);
-  if(cat)for(let i=-1;i<=1;i++)oval(head,0x875937,i*0.055,0.233,0.139,0.017,0.047,0.015);
-  if(type==='dog')oval(head,cream,0,0.18,0.168,0.033,0.079,0.019);
-  piece(core,geo('cyl',0.163,0.171,0.06,12),0x449C99,0,0.445,0.20);
-  const tail=pivot(body,0,0.385,-0.29);
-  if(cat){oval(tail,fur,0.033,0.16,-0.07,0.075,0.23,0.075).rotation.x=-0.35;oval(tail,0x81563B,0.035,0.355,-0.135,0.062,0.08,0.059);}
-  else oval(tail,bunny?cream:fur,0,0.06,-0.07,bunny?0.10:0.073,bunny?0.11:0.14,0.10);
-  const legs=[];for(const x of [-0.135,0.135])for(const z of [-0.19,0.17]){
-    const leg=pivot(body,x,0.24,z);oval(leg,fur,0,-0.075,0,0.067,0.092,0.064);
-    oval(leg,cream,0,-0.178,0.024,0.074,0.068,0.10);batch(leg);legs.push(leg);
+  eyes(head,.12,low?.202:.158,.106,.033);
+  for(const x of [-1,1])for(const z of [-1,1]){
+    const leg=pivot(body,x*(low?.235:.14),low?.175:.23,z*.19-.04);
+    oval(leg,fur,0,-.07,0,.067,.10,.076);
+    oval(leg,low?fur:cream,0,low?-.124:-.175,.027,bunny?.09:.072,.057,bunny && z<0?.17:.098);
+    batch(leg);legs.push(leg);
   }
-  batch(head);batch(core);batch(tail);
-  root.userData.pet={body,head,legs,tail,type};return root;
+  batch(core);batch(head);batch(tail);root.userData.pet={body,head,legs,tail,type};return root;
 }
 const target=new THREE.Vector3(),dir=new THREE.Vector3();
 export function followPet(pet,owner,dt,t,world){

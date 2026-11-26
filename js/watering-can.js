@@ -29,17 +29,30 @@ export function createWateringCan(camera) {
   const hand=new THREE.Group();camera.add(hand);hand.visible=false;
   hand.position.set(0.30,-0.27,-0.58);hand.scale.setScalar(0.39);
   let level=canLevel(state),can=canModel(level);can.rotation.y=0.12;hand.add(can);
-  let elapsed=1; const tip=new THREE.Vector3();
+  const glove=new THREE.Group();
+  function gripPart(color,x,y,z,w,h,d){
+    const m=new THREE.Mesh(geo('sph',1,10,7),mat(color));m.position.set(x,y,z);m.scale.set(w,h,d);glove.add(m);
+  }
+  gripPart(0x397a88,.68,-.055,.19,.19,.13,.26);
+  gripPart(0xffe6c4,.52,.10,.085,.14,.135,.15);
+  for(let i=0;i<3;i++)gripPart(0xf3d4ad,.47,.18-i*.063,-.024,.083,.042,.067);
+  gripPart(0xffead1,.456,.213,.106,.09,.046,.062);
+  hand.add(glove);
+  let elapsed=1,raised=0; const tip=new THREE.Vector3();
   return {
-    pour(){elapsed=0;return can.userData.tip.getWorldPosition(tip);},
+    pour(){elapsed=0;hand.visible=true;return can.userData.tip.getWorldPosition(tip);},
     update(dt,visible,time){
       if(level!==canLevel(state)){
         hand.remove(can);level=canLevel(state);can=canModel(level);can.rotation.y=0.12;hand.add(can);
       }
       hand.visible=visible;elapsed+=dt;
-      if(!visible)return;
-      can.rotation.z=0.08+0.40*Math.sin(Math.min(elapsed/0.62,1)*Math.PI);
-      hand.position.y=-0.27+Math.sin(time*1.7)*0.003;
+      if(!visible){raised=0;return;}
+      raised+=(1-raised)*(1-Math.exp(-dt*18));
+      hand.rotation.z=0.08+0.40*Math.sin(Math.min(elapsed/0.62,1)*Math.PI);
+      hand.position.y=-0.27-(1-raised)*.12+Math.sin(time*1.7)*0.003;
+      const halfWidth=.58*Math.tan(camera.fov*Math.PI/360)*camera.aspect;
+      hand.scale.setScalar(Math.min(.39,halfWidth*.88));
+      hand.position.x=Math.min(.30,halfWidth*.48);
     }
   };
 }

@@ -549,7 +549,7 @@ export function createWorld(scene) {
   scene.add(poles, bases, arms, bulbs, caps);
 
   // --- Nuvens e estrelas ---
-  const clouds=cloudField(scene,rnd);world.clouds=clouds.group;world.setCloudQuality=clouds.quality;
+  const clouds=cloudField(scene);world.clouds=clouds.group;world.setCloudQuality=clouds.quality;
   const sGeo = new THREE.BufferGeometry(); const sPos = new Float32Array(500 * 3);
   for (let i = 0; i < 500; i++) {
     const a = rnd() * Math.PI * 2, b = Math.acos(rnd() * 0.9 + 0.1), r = 380;
@@ -613,11 +613,11 @@ export function createWorld(scene) {
   };
 
   let elapsed = 0;
-  world.update = (dt,time=8,weather=null) => {
+  world.update = (dt,time=8,weather=null,viewer=null) => {
     clockTower(time);
     elapsed += dt;
     for (let i = 0; i < PULSES.length; i++) { const p = PULSES[i]; p.m.emissiveIntensity = p.base + Math.sin(elapsed * p.speed) * p.amp * 0.5; }
-    clouds.update(dt,time,weather);
+    clouds.update(dt,time,weather,viewer);
     water.material.map.offset.set((elapsed*.025)%1,(elapsed*.019)%1);
     water.position.y = -6 + Math.sin(elapsed * 0.5) * 0.12;
     // Ponte cresce quando a ilha e liberada

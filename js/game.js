@@ -189,6 +189,7 @@ function waterPlot(plot, byDrone) {
   const wasSick = plot.sick;
   plot.sick = false; plot.dirty = true;
   if (!byDrone) {
+    if(HOTBAR[state.selectedSlot]?.type!=='can')selectSlot(2);
     const tip = wateringCan.pour();
     waterJet(tip.x,tip.y,tip.z,plot.x,0.55,plot.z);
   } else burst(plot.x,1.3,plot.z,0x4FC3F7,6,1.2,1.5);
@@ -312,6 +313,7 @@ function waterTree(tree, byDrone) {
   const used = Math.min(state.water, 2);
   state.water -= used; tree.water = Math.min(8, tree.water + used * 2.5*(byDrone?1:canEfficiency(state)));
   if (!byDrone) {
+    if(HOTBAR[state.selectedSlot]?.type!=='can')selectSlot(2);
     const tip = wateringCan.pour();
     waterJet(tip.x,tip.y,tip.z,tree.x,0.55,tree.z);
   } else burst(tree.x,1.3,tree.z,0x4FC3F7,6,1.2,1.5);
@@ -1089,6 +1091,14 @@ function bindInteraction() {
       if (open) { if (CLOSE_ON_E.includes(modalId())) closeModal(); return; }
       if (state.paused || isResumeVisible()) return;
       if (build) tryPlace(); else interact();
+    } else if(e.code==='KeyR' && !open && !state.paused && !isResumeVisible()){
+      if(build)cancelBuild();
+      selectSlot(2);
+      const plant=target.type==='plot' && target.ref.crop;
+      if(plant || target.type==='tree'){
+        const watered=plant?waterPlot(target.ref,false):waterTree(target.ref,false);
+        if(!watered)showToast(state.water<.5?'Encha o regador na bomba.':'Já tem água suficiente.','info');
+      }else if(target.type==='pump')useWaterPump();
     } else if (e.code === 'KeyI') {
       if (!open || modalId() === 'inventory') toggleInventory();
     } else if (e.code === 'KeyG') {
@@ -1230,8 +1240,8 @@ export function updateGame(dt) {
   clock += dt; updateWater(dt);
   if(state.mode==='play')myPet.update(state.activePet,camera.position,dt,clock,world);
   wateringCan.update(dt,state.mode==='play' && !state.paused && HOTBAR[state.selectedSlot]?.type==='can',clock);
-  if (state.mode !== 'play') { world.update(dt,state.time,state.event?.id); updateEffects(dt); return; }
-  if (state.paused || isResumeVisible()) { setPrompt(''); updateEffects(dt); world.update(dt,state.time,state.event?.id); return; }
+  if (state.mode !== 'play') { world.update(dt,state.time,state.event?.id,camera.position); updateEffects(dt); return; }
+  if (state.paused || isResumeVisible()) { setPrompt(''); updateEffects(dt); world.update(dt,state.time,state.event?.id,camera.position); return; }
 
   state.stats.play += dt;
   const day = updateDayNight(dt);
@@ -1243,7 +1253,7 @@ export function updateGame(dt) {
   updateInstances(dt, clock);
   updateDrones(dt, camera, clock);
   updateEffects(dt);
-  world.update(dt,state.time,state.event?.id);
+  world.update(dt,state.time,state.event?.id,camera.position);
 
   if (!state.islandUnlocked && state.level >= CONFIG.islandLevel) unlockIsland();
   if ((availTimer -= dt) <= 0) { availTimer = 1; if (state.research.towers) refreshAvailability(true); }

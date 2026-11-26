@@ -100,7 +100,7 @@ export function stockUsed() {
   return n;
 }
 export const treeLimit = () => CONFIG.baseTreeLimit + 4 * state.land.orchard;
-export const soilGrowth = () => 1 + 0.08 * state.land.soil;
+export const soilGrowth = () => (1 + 0.08 * state.land.soil)*(state.activePet==='turtle'?1.2:1);
 export const soilDouble = () => 0.05 * state.land.soil;
 export const mutKey = (m, c) => m + ':' + c;
 export const stockFree = () => Math.max(0, stockLimit() - stockUsed());

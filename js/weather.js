@@ -70,85 +70,75 @@ export function rainField(scene) {
   };
 }
 
-// Centros e semieixos em três dimensões. Há gomos na frente, no topo e no fundo.
-const cloudProfiles=[
-  [[-.58,.05,-.03,.46,.40,.45],[-.20,.29,.04,.54,.59,.46],
-   [.28,.25,-.20,.49,.49,.53],[.63,.06,.06,.44,.35,.38],[-.16,.04,.34,.42,.31,.35]],
-  [[-.64,.03,.10,.41,.29,.36],[-.26,.18,-.18,.52,.43,.47],
-   [.18,.37,.03,.52,.68,.51],[.60,.10,.03,.45,.40,.41],[.19,.11,.34,.41,.36,.34]],
-  [[-.68,.04,-.07,.43,.28,.42],[-.32,.15,.15,.48,.41,.47],
-   [.12,.17,-.18,.55,.42,.53],[.56,.09,.12,.52,.35,.41],[.27,-.01,.37,.34,.23,.31]]
-];
-
-function cloudVolume(profile) {
-  // Projetar uma única casca sobre os gomos mantém a silhueta contínua de todos os ângulos.
-  const geometry=new THREE.SphereGeometry(1,40,24);
-  const position=geometry.attributes.position;
-  const colors=[],tint=new THREE.Color();
-  const shade=new THREE.Color(0xa4b4cf), body=new THREE.Color(0xe5eaf0), light=new THREE.Color(0xfffaeb);
-  const lobes=[[0,0,0,.96,.32,.53],...profile];
-  const direction=new THREE.Vector3();
-  for(let i=0;i<position.count;i++){
-    direction.fromBufferAttribute(position,i);
-    const {x,y,z}=direction;
-    let radius=0;
-    for(const [cx,cy,cz,rx,ry,rz] of lobes){
-      const a=(x/rx)**2+(y/ry)**2+(z/rz)**2;
-      const b=x*cx/rx**2+y*cy/ry**2+z*cz/rz**2;
-      const c=(cx/rx)**2+(cy/ry)**2+(cz/rz)**2-1;
-      const disc=b*b-a*c;
-      if(disc<0)continue;
-      const outer=(b+Math.sqrt(disc))/a;
-      const overlap=Math.max(0,.065-Math.abs(radius-outer));
-      radius=Math.max(radius,outer)+overlap*overlap/.26;
-    }
-    const py=y*radius;
-    const underside=py<0?py*.62:py;
-    position.setXYZ(i,x*radius,underside,z*radius);
-    const relief=py+.11*Math.sin(8*x*radius+3*z)*Math.cos(5*z*radius)-.08*x;
-    tint.copy(shade).lerp(body,THREE.MathUtils.smoothstep(relief,-.22,.16));
-    tint.lerp(light,THREE.MathUtils.smoothstep(relief,.18,.49));
-    colors.push(tint.r,tint.g,tint.b);
+// Campo periódico de umidade. Os dois canais têm escalas e fases independentes.
+function vaporMap(){
+  const size=256, pixels=new Uint8Array(size*size*4);
+  function noise(u,v,n,salt){
+    const px=u*n,py=v*n,x=Math.floor(px),y=Math.floor(py);
+    const ease=t=>t*t*(3-2*t);
+    const hash=(a,b)=>{
+      let h=Math.imul(a%n+salt,374761393)+Math.imul(b%n,668265263);
+      h=Math.imul(h^(h>>>13),1274126177);
+      return ((h^(h>>>16))>>>0)/4294967295;
+    };
+    const mix=THREE.MathUtils.lerp;
+    return mix(mix(hash(x,y),hash(x+1,y),ease(px-x)),mix(hash(x,y+1),hash(x+1,y+1),ease(px-x)),ease(py-y));
   }
-  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  geometry.computeVertexNormals();
-  // O temporal engrossa a base e alarga o topo para formar uma bigorna a sotavento.
-  const fair=position.array.slice();
-  let lastStorm=0;
-  function shape(storm){
-    if(storm===lastStorm || (storm>0 && storm<1 && Math.abs(storm-lastStorm)<.016))return;
-    lastStorm=storm;
-    for(let i=0;i<position.count;i++){
-      const k=i*3,x=fair[k],y=fair[k+1],z=fair[k+2];
-      const cap=THREE.MathUtils.smoothstep(y,.12,.58);
-      position.setXYZ(i,x*(1+.17*cap*storm)+cap*.21*storm,
-        y*(1+storm*(y<0 ? .95 : .16)),z*(1+.22*storm*cap));
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const i=4*(x+size*y),u=x/size,v=y/size;
+    for(let c=0;c<2;c++){
+      let sum=0;
+      for(let k=0;k<5;k++)sum+=noise(u,v,4<<k,31*(c+1)+k)/(2**(k+1));
+      pixels[i+c]=Math.round(sum*255/.96875);
     }
-    position.needsUpdate=true;geometry.computeVertexNormals();
-    geometry.computeBoundingSphere();
+    pixels[i+3]=255;
   }
-  return {geometry,shape};
+  const map=new THREE.DataTexture(pixels,size,size);
+  map.wrapS=map.wrapT=THREE.RepeatWrapping;
+  map.minFilter=THREE.LinearMipmapLinearFilter;map.magFilter=THREE.LinearFilter;
+  map.generateMipmaps=true;map.needsUpdate=true;return map;
 }
 
-export function cloudField(scene,random) {
-  const group=new THREE.Group();group.name='Camadas de nuvens';scene.add(group);
-  const material=new THREE.MeshLambertMaterial({vertexColors:true,color:0xffffff,
-    emissive:0x5b6278,emissiveIntensity:.26});
-  const banks=cloudProfiles.map(profile=>{
-    const {geometry,shape}=cloudVolume(profile);
-    const layout=Array.from({length:16},()=>({
-      x:random()*720,z:random()*760-320,y:49+random()*38,
-      radius:10+random()*10, heading:(random()-.5)*1.5, speed:.8+random()*1.3
-    }));
-    const mesh=new THREE.InstancedMesh(geometry,material,layout.length);
-    mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    const variation=new THREE.Color();
-    for(let i=0;i<layout.length;i++){
-      const warmth=.5+.5*Math.sin(layout[i].x);
-      mesh.setColorAt(i,variation.setRGB(.94+.06*warmth,.96+.03*warmth,1-.04*warmth));
-    }
-    group.add(mesh);return {mesh,layout,shape};
-  });
+export function cloudField(scene){
+  const group=new THREE.Group();scene.add(group);
+  const uniforms={vapor:{value:vaporMap()},wind:{value:new THREE.Vector2()},evolution:{value:0},
+    cover:{value:0},sunDir:{value:new THREE.Vector2()},lit:{value:new THREE.Color()},base:{value:new THREE.Color()}};
+  const density=`
+    uniform sampler2D vapor;uniform vec2 wind,sunDir;uniform float cover,evolution;
+    float density(vec2 p){
+      vec2 uv=p*.0036+wind;
+      vec2 curl=texture2D(vapor,uv*.57+vec2(evolution,0.)).rg-.5;
+      vec2 field=texture2D(vapor,uv+curl*.26).rg;
+      float wisps=texture2D(vapor,uv*2.83-curl*.32-wind*.44).g;
+      return field.r*.68+field.g*.21+wisps*.11+cover*.105;
+    }`;
+  const surface=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,
+    vertexShader:`varying vec3 wp;void main(){wp=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.);}`,
+    fragmentShader:density+`
+      varying vec3 wp;uniform vec3 lit,base;
+      void main(){
+        float d=density(wp.xz);
+        float haze=1.-smoothstep(270.,510.,distance(wp.xz,cameraPosition.xz));
+        float a=smoothstep(.425,.575,d)*haze;
+        if(a<.007)discard;
+        float upstream=density(wp.xz+sunDir*6.);
+        float edge=1.-smoothstep(.47,.63,d);
+        float relief=clamp(.48+4.5*(d-upstream)+.54*edge,0.,1.);
+        vec3 ink=mix(base,lit,mix(relief,smoothstep(.24,.8,relief),.24));
+        gl_FragColor=vec4(ink,a);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`});
+  const veil=new THREE.Mesh(new THREE.PlaneGeometry(1150,1150),surface);
+  veil.rotation.x=-Math.PI/2;veil.renderOrder=-60;group.add(veil);
+  // A sombra usa a mesma densidade da camada visível.
+  const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,side:THREE.DoubleSide});
+  depth.onBeforeCompile=sh=>{
+    Object.assign(sh.uniforms,uniforms);
+    sh.vertexShader='varying vec2 cloudXZ;\n'+sh.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\ncloudXZ=(modelMatrix*vec4(transformed,1.)).xz;');
+    sh.fragmentShader='varying vec2 cloudXZ;\n'+density+'\n'+sh.fragmentShader.replace('#include <alphatest_fragment>','#include <alphatest_fragment>\nif(density(cloudXZ)<.59)discard;');
+  };
+  veil.customDepthMaterial=depth;
   const curtain=new THREE.Mesh(new THREE.CylinderGeometry(195,197,48,64,1,true),
     new THREE.ShaderMaterial({
       uniforms:{phase:{value:0}},side:THREE.DoubleSide,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
@@ -163,46 +153,25 @@ export function cloudField(scene,random) {
         }`
     }));
   curtain.position.set(0,59,-14);curtain.visible=false;group.add(curtain);
-  const dummy=new THREE.Object3D(),dark=new THREE.Color(0x7987aa);
-  const clear=new THREE.Color(0xfffdf7),sunset=new THREE.Color(0xffbc91),night=new THREE.Color(0x969fbe);
-  let cover=0,wind=0,tick=1;
-  function update(dt,time,event){
-    const target=event==='tempest'?1:event==='rain' ? .63 : event==='solar' ? .40 : event==='drought' ? -.35 : 0;
-    cover+=(target-cover)*(1-Math.exp(-dt*.62));
-    if(Math.abs(target-cover)<.002)cover=target;
-    const storm=Math.max(0,cover);
-    wind+=dt*(1+storm*2);
+  const shade=new THREE.Color(0xa2afcb),stormShade=new THREE.Color(0x565f79);
+  const day=new THREE.Color(0xfffbef),night=new THREE.Color(0x7987aa),dusk=new THREE.Color(0xffc29c);
+  let amount=0;
+  function update(dt,time,event,viewer){
+    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.5 : 0;
+    amount+=(target-amount)*(1-Math.exp(-dt*.23));
     if(!group.visible)return;
     curtain.visible=event==='aurora';
     if(curtain.visible)curtain.material.uniforms.phase.value+=dt*.36;
-    if((tick+=dt)<.11)return;
-    tick=0;
-    const dusk=Math.max(0,1-Math.min(Math.abs(time-6),Math.abs(time-18))/2.2);
-    const daylight=THREE.MathUtils.smoothstep(-Math.cos(time*Math.PI/12),-.20,.22);
-    material.color.copy(night).lerp(clear,daylight).lerp(sunset,dusk*.58).lerp(dark,storm*.95);
-    material.emissiveIntensity=.14+daylight*.18;
-    for(const {mesh,layout,shape} of banks){
-      shape(storm);
-      for(let i=0;i<mesh.count;i++){
-        const bank=layout[i],size=bank.radius*(1+.41*cover);
-        const x=(bank.x+wind*bank.speed)%720-270;
-        dummy.position.set(x,bank.y-13*storm,bank.z+3*Math.sin(.014*wind+bank.heading));
-        dummy.rotation.y=bank.heading;
-        dummy.scale.set(size*(1.55+.38*storm),size*(.90+.17*storm),size*1.33);
-        dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
-      }
-      mesh.instanceMatrix.needsUpdate=true;
-      // O passe de sombras também consulta a esfera de todas as instâncias.
-      if(mesh.castShadow)mesh.computeBoundingSphere();
-    }
+    const a=time*Math.PI/12, daylight=THREE.MathUtils.smoothstep(-Math.cos(a),-.18,.25);
+    const sunset=1-THREE.MathUtils.smoothstep(Math.abs(Math.cos(a)),0,.38);
+    uniforms.cover.value=amount;
+    uniforms.wind.value.x+=dt*.0019*(1+amount);
+    uniforms.evolution.value+=dt*.00065;
+    uniforms.sunDir.value.set(Math.cos(a),Math.sin(a));
+    uniforms.lit.value.copy(night).lerp(day,daylight).lerp(dusk,sunset*.72).lerp(shade,Math.max(0,amount)*.63);
+    uniforms.base.value.copy(night).lerp(shade,daylight).lerp(stormShade,Math.max(0,amount));
+    veil.position.set(viewer?.x??0,63-amount*19,viewer?.z??0);veil.updateMatrix();
   }
-  function quality(level){
-    group.visible=level!=='baixa';
-    for(const {mesh,layout} of banks){
-      mesh.count=level==='alta'?layout.length:9;
-      mesh.castShadow=level==='alta';
-    }
-    tick=1;
-  }
+  function quality(level){group.visible=level!=='baixa';veil.castShadow=level==='alta';}
   update(0,10,null);return {group,update,quality};
 }
