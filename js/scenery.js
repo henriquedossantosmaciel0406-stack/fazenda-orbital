@@ -27,9 +27,9 @@ export function applyWind(material, amp = 0.12, speed = 1.6) {
 }
 
 const SKY = {
-  dayTop: new THREE.Color(0x3C93F2), dayHor: new THREE.Color(0xBDE9FF),
+  dayTop: new THREE.Color(0x568EDB), dayHor: new THREE.Color(0xBDE9FF),
   nightTop: new THREE.Color(0x070A24), nightHor: new THREE.Color(0x2A2D63),
-  dusk: new THREE.Color(0xFF9A66)
+  dusk: new THREE.Color(0xFF9A66), twilight:new THREE.Color(0x907EBA), peach:new THREE.Color(0xFAC3A2)
 };
 
 let dome, domeU, sunSprite, moonSprite, grass, flowers, fireflies, ffU, rainbow, patches;
@@ -90,7 +90,10 @@ export function initScenery(scene, camera, world) {
         vec3 c = mix(uHor, uTop, pow(h, 0.55));
         float s = max(dot(normalize(vD), normalize(uSun)), 0.0);
         c = mix(c, uGlow, uGlowAmt * pow(s, 3.0) * (1.0 - h * 0.6));
-        gl_FragColor = vec4(c, 1.0); }`
+        gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`
   }));
   dome.renderOrder = -1000; dome.frustumCulled = false; scene.add(dome);
 
@@ -116,13 +119,28 @@ export function initScenery(scene, camera, world) {
 
   // --- Flores com haste que balancam ---
   const stem = new THREE.CylinderGeometry(0.025, 0.035, 0.55, 4); stem.translate(0, 0.275, 0);
-  const head = new THREE.IcosahedronGeometry(0.17, 0); head.translate(0, 0.6, 0);
+
   const sc2 = new THREE.Color(0x4DB35A);
   const flowerGeo = (() => {
-    const a = stem.toNonIndexed(), b = head.toNonIndexed();
-    const paint = (g, c) => { const arr = new Float32Array(g.attributes.position.count * 3); for (let i = 0; i < arr.length; i += 3) { arr[i] = c.r; arr[i + 1] = c.g; arr[i + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(arr, 3)); };
-    paint(a, sc2); paint(b, new THREE.Color(0xffffff));
-    return mergeGeometries([a, b]);
+    const pieces=[];
+    function paint(shape,color){
+      const geometry=shape.index?shape.toNonIndexed():shape;
+      const values=new Float32Array(geometry.attributes.position.count*3);
+      for(let i=0;i<values.length;i+=3)color.toArray(values,i);
+      geometry.setAttribute('color',new THREE.BufferAttribute(values,3));
+      pieces.push(geometry);
+    }
+    paint(stem,sc2);
+    for(let i=0;i<5;i++){
+      const angle=i*Math.PI*2/5;
+      const petal=new THREE.OctahedronGeometry(1);
+      petal.scale(.079,.052,.123);
+      petal.rotateX(-.31);petal.translate(0,.57,.105);petal.rotateY(angle);
+      paint(petal,new THREE.Color(0xfff5e2));
+    }
+    const center=new THREE.IcosahedronGeometry(.068,0);
+    center.translate(0,.61,0);paint(center,new THREE.Color(0xffc465));
+    return mergeGeometries(pieces);
   })();
   const flowerMat = applyWind(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient, vertexColors: true }), 0.35, 1.9);
   flowers = new THREE.InstancedMesh(flowerGeo, flowerMat, 420);
@@ -191,6 +209,14 @@ export function initScenery(scene, camera, world) {
   world.rainbow = rainbow;
 }
 
+export function setFieldQuality(quality){
+  const density={baixa:.24,media:.65,alta:1}[quality] ?? .65;
+  for(const field of [grass,flowers]){
+    field.userData.totalPlants ??= field.count;
+    field.count=Math.round(field.userData.totalPlants*density);
+  }
+}
+
 // day 0..1, wv = weatherVisual, rainbowOn bool, rain 0..1
 export function updateScenery(dt, t, ang, camera, sun, wv, rainbowOn, rainAmt) {
   windUniform.value += dt * (1 + rainAmt * 1.5);
@@ -205,6 +231,8 @@ export function updateScenery(dt, t, ang, camera, sun, wv, rainbowOn, rainAmt) {
   domeU.uTop.value.lerpColors(SKY.nightTop, SKY.dayTop, dayK);
   domeU.uHor.value.lerpColors(SKY.nightHor, SKY.dayHor, dayK);
   const dusk = Math.max(0, 1 - Math.abs(elev) / 0.32);
+  domeU.uTop.value.lerp(SKY.twilight,dusk*.69);
+  domeU.uHor.value.lerp(SKY.peach,dusk*.82);
   domeU.uGlowAmt.value = dusk * 0.95;
   if (wv.amount > 0.01) {
     tmpC.copy(wv.color).multiplyScalar(0.35 + 0.65 * dayK);

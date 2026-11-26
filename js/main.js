@@ -13,6 +13,7 @@ import { applyVolumes } from './audio.js';
 import { mergeGroupStatic } from './optimize.js';
 import { restoreEventVisuals } from './events.js';
 import { setEffectsQuality } from './effects.js';
+import {setFieldQuality} from './scenery.js';
 import { setOutlines } from './toon.js';
 
 const canvas = document.getElementById('game');
@@ -73,6 +74,7 @@ function applyResolution() {
 function applyQuality() {
   const q = state.settings.quality;
   setEffectsQuality(q);
+  setFieldQuality(q);
   setOutlines(q !== 'baixa');
   const sun = world.sun;
   const preset=profile();

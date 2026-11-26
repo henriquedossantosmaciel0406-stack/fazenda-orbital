@@ -1,3 +1,4 @@
+import {meadowPaint,seaPaint,planetPaint} from './landscape-paint.js';
 import {cloudField} from './weather.js';
 import { buildTown } from './town.js';
 import { finishStructure } from './workshop.js';
@@ -439,10 +440,10 @@ export function createWorld(scene) {
   };
 
   // --- Terreno principal (caixa para parecer uma ilha flutuante) ---
-  const ground = M(geo('box', 240, 8, 240), mat(0x76C95A, { roughness: 0.95, flatShading: false }));
+  const ground = M(geo('box', 240, 8, 240), new THREE.MeshToonMaterial({map:meadowPaint(),gradientMap:toonGradient}));
   ground.position.y = -4; ground.receiveShadow = true; scene.add(ground);
   world.groundMeshes.push(ground);
-  const water = M(geo('plane', 2400, 2400), new THREE.MeshToonMaterial({ color: 0x2FA8F0, gradientMap: toonGradient }));
+  const water = M(geo('plane', 2400, 2400), new THREE.MeshToonMaterial({ map: seaPaint(), gradientMap: toonGradient }));
   water.rotation.x = -Math.PI / 2; water.position.y = -6; scene.add(water);
   world.water = water;
 
@@ -561,7 +562,8 @@ export function createWorld(scene) {
   const planet=new THREE.Group();
   const celestial = color => new THREE.MeshBasicMaterial({color,fog:false});
   planet.position.set(175,120,150);
-  planet.add(new THREE.Mesh(geo('sph',16,32,20),celestial(0xb992e3)));
+  const globe=new THREE.Mesh(geo('sph',16,32,20),new THREE.MeshLambertMaterial({map:planetPaint(),fog:false,emissive:0x382743}));
+  globe.rotation.z=-.24; planet.add(globe);
   const rings=new THREE.Group();
   for(const [radius,width,color] of [[22,1.8,0xffdb96],[25,.55,0xffefbd]]){
     const ring=new THREE.Mesh(geo('tor',radius,width,8,64),celestial(color));rings.add(ring);
@@ -616,6 +618,7 @@ export function createWorld(scene) {
     elapsed += dt;
     for (let i = 0; i < PULSES.length; i++) { const p = PULSES[i]; p.m.emissiveIntensity = p.base + Math.sin(elapsed * p.speed) * p.amp * 0.5; }
     clouds.update(dt,time,weather);
+    water.material.map.offset.set((elapsed*.025)%1,(elapsed*.019)%1);
     water.position.y = -6 + Math.sin(elapsed * 0.5) * 0.12;
     // Ponte cresce quando a ilha e liberada
     if (world.islandUnlocked && world.bridgeProgress < 1) world.bridgeProgress = Math.min(1, world.bridgeProgress + dt * 0.35);

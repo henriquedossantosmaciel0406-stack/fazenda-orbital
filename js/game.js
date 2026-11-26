@@ -1125,6 +1125,9 @@ function updateResources(dt, day) {
   if (state.energy > me) state.energy = me;
 }
 
+const daylight=new THREE.Color(0xfff4d9), twilight=new THREE.Color(0xffb07a);
+const moonlight=new THREE.Color(0xa2b9e7), nightFill=new THREE.Color(0x8495ca);
+const skyFill=new THREE.Color(0xd7f1ff);
 function updateDayNight(dt) {
   state.time += dt / CONFIG.dayLength * 24;
   if (state.time >= 24) {
@@ -1136,6 +1139,11 @@ function updateDayNight(dt) {
   const day = Math.max(0, Math.sin(ang - Math.PI / 2));
   const wv = weatherVisual;
   const c = camera.position;
+  const elevation=-Math.cos(ang);
+  const daylightMix=THREE.MathUtils.smoothstep(elevation,-.18,.20);
+  const sunset=1-THREE.MathUtils.smoothstep(Math.abs(elevation),0,.42);
+  world.sun.color.copy(moonlight).lerp(daylight,daylightMix).lerp(twilight,sunset*.83);
+  world.hemi.color.copy(nightFill).lerp(skyFill,daylightMix);
   world.sun.intensity = (0.4 + day * 2) * wv.light;
   world.sun.position.set(c.x + Math.cos(ang) * 40, 25 + day * 25, c.z + Math.sin(ang) * 40);
   world.sun.target.position.set(c.x, 0, c.z); world.sun.target.updateMatrixWorld();
