@@ -549,7 +549,7 @@ export function createWorld(scene) {
   scene.add(poles, bases, arms, bulbs, caps);
 
   // --- Nuvens e estrelas ---
-  const clouds=cloudField(scene,rnd);world.clouds=clouds.group;
+  const clouds=cloudField(scene,rnd);world.clouds=clouds.group;world.setCloudQuality=clouds.quality;
   const sGeo = new THREE.BufferGeometry(); const sPos = new Float32Array(500 * 3);
   for (let i = 0; i < 500; i++) {
     const a = rnd() * Math.PI * 2, b = Math.acos(rnd() * 0.9 + 0.1), r = 380;

@@ -59,9 +59,9 @@ restoreEventVisuals();
 
 // ---------- Qualidade e resolucao dinamica ----------
 const profiles = {
-  baixa: {pixels:0.75, mobile:0.75, shadow:0, stars:80, clouds:false, planet:false},
-  media: {pixels:1.25, mobile:1.15, shadow:1024, stars:280, clouds:true, planet:true},
-  alta: {pixels:2, mobile:1.65, shadow:2048, stars:500, clouds:true, planet:true}
+  baixa: {pixels:0.75, mobile:0.75, shadow:0, stars:80, planet:false},
+  media: {pixels:1.25, mobile:1.15, shadow:1024, stars:280, planet:true},
+  alta: {pixels:2, mobile:1.65, shadow:2048, stars:500, planet:true}
 };
 const profile = () => profiles[state.settings.quality] || profiles.media;
 let resScale = 1; // multiplicador automatico (0.5 a 1)
@@ -80,8 +80,7 @@ function applyQuality() {
   const preset=profile();
   renderer.shadowMap.enabled = sun.castShadow = !!preset.shadow;
   renderer.shadowMap.type = q==='alta' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-  world.clouds.visible=preset.clouds;
-  world.clouds.getObjectByName('Bancos de nuvem').castShadow=q==='alta';
+  world.setCloudQuality(q);
   world.skyPlanet.visible=preset.planet;
   world.skyPlanet.children[1].visible=q==='alta';
   world.stars.geometry.setDrawRange(0,preset.stars);
