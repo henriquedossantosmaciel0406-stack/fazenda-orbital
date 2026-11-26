@@ -49,7 +49,7 @@ export async function connectHttpRoom(op,code,handlers){
       for(const event of reply.events){
         if(!active)break;
         if(event.msg?.t==='pos')movingUntil=performance.now()+450;
-        after=event.cursor;if(event.gone)handlers.onGone(event.from);else handlers.onMsg(event.from,event.msg);
+        after=event.cursor;if(event.admin)handlers.onAdmin(event.admin);else if(event.gone)handlers.onGone(event.from);else handlers.onMsg(event.from,event.msg);
       }
       const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
       const idleDelay=alone?650:performance.now()<movingUntil?55:130;
@@ -63,5 +63,5 @@ export async function connectHttpRoom(op,code,handlers){
     }finally{inFlight=false;if(active)schedule(delay||235);}
   }
   addEventListener('pagehide',close);schedule(10);
-  return {id,close,directPoses:true,sendHost:msg=>enqueue({msg}),sendTo:(to,msg)=>enqueue({to,msg}),broadcast:(msg,except)=>enqueue({except,msg})};
+  return {id,close,admin:action=>request({op:'admin',id,token,...action}),directPoses:true,sendHost:msg=>enqueue({msg}),sendTo:(to,msg)=>enqueue({to,msg}),broadcast:(msg,except)=>enqueue({except,msg})};
 }

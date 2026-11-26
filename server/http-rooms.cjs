@@ -43,6 +43,10 @@ if op=='host' or op=='join' then
 end
 local me=members[id]
 if not me or me.proof~=proof then return {410,'Sua conexão com esta sala expirou.'} end
+if op=='admin' then
+  if nick~='rick' or me.nick~=nick then return {403,'Comando exclusivo de Rick.'} end
+  post(room.host,id,'@admin:'..ARGV[9]);persist();return {200,'ok',total}
+end
 if op=='leave' then
   if id==room.host then erase() else members[id]=nil;redis.call('DEL',inbox(id));post(room.host,id,'@gone');persist() end
   return {200,'ok',0}
@@ -71,14 +75,19 @@ module.exports=async function handle(req,res){
     if(req.method!=='POST')throw fail(405,'Use POST.');
     if(req.headers.origin&&new URL(req.headers.origin).host!==req.headers.host)throw fail(403,'Origem inválida.');
     const d=await accounts.body(req), {op,code}=d;
-    if(!['host','join','poll','leave'].includes(op)||typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code))throw fail(400,'Código ou operação inválidos.');
+    if(!['host','join','poll','leave','admin'].includes(op)||typeof code!=='string'||!/^[A-Z0-9]{6}$/.test(code))throw fail(400,'Código ou operação inválidos.');
     const admission=op==='host'||op==='join';
-    let id=d.id,token=d.token,nick='',packets=[];
+    let id=d.id,token=d.token,nick='',packets=[],action=null;
     if(admission){
       const {a}=await accounts.current(req);nick=a.nick.toLowerCase();
       id=randomUUID();token=randomBytes(32).toString('hex');
     }else{
       if(!identity.test(id)||typeof token!=='string'||!/^([a-f0-9]{64})$/.test(token))throw fail(401,'Sessão da sala inválida.');
+      if(op==='admin'){
+        const {a}=await accounts.current(req);
+        action=accounts.adminAction(a,d,true);
+        nick=a.nick.toLowerCase();
+      }
       if(op==='poll'){
         if(!Number.isSafeInteger(d.seq)||d.seq<1||!Number.isSafeInteger(d.after)||d.after<0||!Array.isArray(d.packets)||d.packets.length>48)throw fail(400,'Lote da sala inválido.');
         packets=d.packets.map(p=>{
@@ -90,11 +99,12 @@ module.exports=async function handle(req,res){
         });
       }
     }
-    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets));
+    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets),JSON.stringify(action));
     const [status,message,size,rows]=result;
     if(status!==200)throw fail(status,message);
     if(admission)return send(200,{ok:true,id,token,size});
-    const events=(rows||[]).map(([cursor,fields])=>({cursor:Number(cursor.split('-')[0]),from:fields[1]||null,...(fields[3]==='@gone'?{gone:true}:{msg:JSON.parse(fields[3])})}));
+    if(op==='admin')return send(200,{ok:true});
+    const events=(rows||[]).map(([cursor,fields])=>({cursor:Number(cursor.split('-')[0]),from:fields[1]||null,...(fields[3]==='@gone'?{gone:true}:fields[3].startsWith('@admin:')?{admin:JSON.parse(fields[3].slice(7))}:{msg:JSON.parse(fields[3])})}));
     send(200,{ok:true,size,events});
   }catch(e){send(e.status||503,{ok:false,error:e.status?e.message:'Servidor de salas temporariamente indisponível.'});}
 };

@@ -16,7 +16,7 @@ import { vcMat } from './optimize.js';
 import { plotGeometry, cropGeometry, treeGeometry } from './game.js';
 import { showToast, openModal, closeModal, el, row, setNetChip } from './ui.js';
 import { play } from './audio.js';
-import { restoreEventVisuals } from './events.js';
+import { applyWorldCommand, restoreEventVisuals } from './events.js';
 
 const PREFIX = 'fazorb-v2-', MAX_REMOTE = 3;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -468,6 +468,10 @@ function sendFarm() {
 function setupTransportHandlers() {
   return {
     onPeer() {},
+    onAdmin(action){
+      if(N.mode!=='host')return;
+      applyWorldCommand(action);sendSync();
+    },
     onMsg: (from, m) => handle(from, m),
     onGone: from => {
       if (!from && N.mode === 'host') { showToast('Conexão com o servidor encerrada', 'bad'); leave(true); }
@@ -528,6 +532,11 @@ export function leave(silent) {
   N.mode = 'solo'; N.code = null; N.tr = null; N.myId = null;
   refreshChip(); refreshModal();
   if (!silent) showToast('Voce saiu da sala', 'info');
+}
+
+export function requestRoomAdmin(action){
+  if(N.mode!=='guest'||!N.tr?.admin)throw new Error('Use o servidor oficial da fazenda para controlar esta sala.');
+  return N.tr.admin(action);
 }
 
 export const netInfo = () => ({ mode: N.mode, code: N.code, players: N.remotes.size + (N.mode === 'solo' ? 0 : 1), remotes: [...N.remotes.values()] });

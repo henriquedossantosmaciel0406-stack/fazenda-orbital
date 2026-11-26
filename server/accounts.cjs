@@ -35,6 +35,15 @@ async function issue(req,res,a,remember){
 }
 const validSave=s=>s&&typeof s==='object'&&Array.isArray(s.plots)&&Number.isFinite(s.level);
 const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',save:a.save,revision:a.revision});
+function adminAction(a,data,roomOnly=false){
+  if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
+  const commands=['clear','dawn','noon','sunset','night'];
+  const events=['tempest','aurora','rain','rainbow','festival','solar','drought','boom'];
+  if(!roomOnly){commands.push('orchard','refill');events.push('meteor','urgent','merchant');}
+  if(commands.includes(data.command))return {command:data.command};
+  if(events.includes(data.event))return {event:data.event};
+  throw fail(400,'Comando desconhecido.');
+}
 module.exports=async function api(req,res,route,attempt=0){
   const send=(status,data)=>res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data));
   try{
@@ -67,13 +76,7 @@ module.exports=async function api(req,res,route,attempt=0){
       await issue(req,res,a,!!data.remember);return send(200,{...view(a),recovery});
     }
     const {a,key}=await current(req);
-    if(route==='admin'){
-      if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
-      if(['clear','dawn','noon','sunset','night','orchard','refill'].includes(data.command))
-        return send(200,{ok:true,command:data.command});
-      if(!['tempest','aurora','rain','meteor','rainbow','festival','solar','drought','boom','urgent','merchant'].includes(data.event))throw fail(400,'Evento desconhecido.');
-      return send(200,{ok:true,event:data.event});
-    }
+    if(route==='admin')return send(200,{ok:true,...adminAction(a,data)});
     if(route==='save'){
       if(data.nick!==a.nick)throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
       if(data.revision!==a.revision)throw fail(409,'Há progresso mais recente em outro navegador. Reabra o jogo para carregá-lo.');
@@ -87,3 +90,5 @@ module.exports=async function api(req,res,route,attempt=0){
 
 module.exports.current=current;
 module.exports.body=body;
+
+module.exports.adminAction=adminAction;

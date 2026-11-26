@@ -431,7 +431,7 @@ export function toggleInventory() {
 // ---------- Pausa, configuracoes, estatisticas, conquistas ----------
 let adminSession=false;
 function openAdmin(){
-  const hours={dawn:6,noon:12,sunset:18,night:22};
+  if(!adminSession)return;
   const groups=[
     ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow'].map(id=>[id,CONFIG.events[id].name])]],
     ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
@@ -439,7 +439,7 @@ function openAdmin(){
     ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia']]]
   ];
   let pending=false;
-  openModal({id:'admin',wide:true,title:'Observatório · ADM',hint:'Quem cria a sala controla o clima e a hora. O pomar e os recursos são da sua conta.',build(body){
+  openModal({id:'admin',wide:true,title:'Observatório · ADM',hint:'Só Rick pode mudar o clima e a hora da sala. Pomar e recursos afetam sua própria fazenda.',build(body){
     const sky=state.event;
     const status=el('div','admin-status');
     status.append(el('strong','',sky ? CONFIG.events[sky.id]?.name : 'Céu aberto'),
@@ -457,16 +457,20 @@ function openAdmin(){
           if(pending)return;
           pending=true;
           try{
-            const {netInfo}=await import('./net.js');
-            const local=['orchard','refill','meteor','boom','urgent','merchant'].includes(id);
-            if(!local && netInfo().mode==='guest'){showToast('Crie a sala para controlar o céu.','info');return;}
-            const result=await api('admin',isEvent?{event:id}:{command:id});
+            const {netInfo,requestRoomAdmin}=await import('./net.js');
+            const local=['orchard','refill','meteor','urgent','merchant'].includes(id);
+            const action=isEvent?{event:id}:{command:id};
+            if(!local && netInfo().mode==='guest'){
+              await requestRoomAdmin(action);
+              if(modalId()==='admin')closeModal();
+              showToast('Comando enviado à sala.','good');return;
+            }
+            const result=await api('admin',action);
             if(!result.ok){showToast(result.error,'bad');return;}
             if(modalId()!=='admin'||(!local && netInfo().mode==='guest'))return;
-            const {triggerEvent,endClimate}=await import('./events.js');
-            if(result.event)triggerEvent(result.event);
-            else if(result.command==='clear')endClimate();
-            else if(Object.hasOwn(hours,result.command))state.time=hours[result.command];
+            const {triggerEvent,applyWorldCommand}=await import('./events.js');
+            if(!local)applyWorldCommand(result);
+            else if(result.event)triggerEvent(result.event);
             else if(result.command==='refill'){
               state.water=waterCap();state.energy=maxEnergy();
             }else if(result.command==='orchard'){

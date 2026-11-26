@@ -46,6 +46,13 @@ function pickEvent() {
   return pool[0];
 }
 
+export function applyWorldCommand(action){
+  if(action.event){triggerEvent(action.event);return;}
+  if(action.command==='clear'){endClimate();return;}
+  const hours={dawn:6,noon:12,sunset:18,night:22};
+  if(Object.hasOwn(hours,action.command))state.time=hours[action.command];
+}
+
 export function triggerEvent(id) {
   const def = CONFIG.events[id];
   if (!def) return;
