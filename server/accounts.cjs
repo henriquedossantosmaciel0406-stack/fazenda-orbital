@@ -69,7 +69,9 @@ module.exports=async function api(req,res,route,attempt=0){
     const {a,key}=await current(req);
     if(route==='admin'){
       if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
-      if(!['tempest','aurora','rain','meteor'].includes(data.event))throw fail(400,'Evento desconhecido.');
+      if(['clear','dawn','noon','sunset','night','orchard','refill'].includes(data.command))
+        return send(200,{ok:true,command:data.command});
+      if(!['tempest','aurora','rain','meteor','rainbow','festival'].includes(data.event))throw fail(400,'Evento desconhecido.');
       return send(200,{ok:true,event:data.event});
     }
     if(route==='save'){

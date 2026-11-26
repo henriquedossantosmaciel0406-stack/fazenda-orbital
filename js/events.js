@@ -89,7 +89,8 @@ export function triggerEvent(id) {
   bus.emit('eventStart', id);
 }
 
-function endClimate() {
+export function endClimate() {
+  if(!state.event)return;
   const id = state.event.id;
   if (id === 'pest') state.plots.forEach(p => { if (p.sick) { p.sick = false; p.dirty = true; } });
   showToast(CONFIG.events[id].name + ' terminou', 'info');

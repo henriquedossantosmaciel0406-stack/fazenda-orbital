@@ -70,56 +70,48 @@ export function rainField(scene) {
   };
 }
 
-// Cada perfil descreve o arco superior da nuvem: centro, largura e altura dos gomos.
+// Centros e semieixos em três dimensões. Há gomos na frente, no topo e no fundo.
 const cloudProfiles=[
-  [[-.64,.36,.48],[-.28,.48,.86],[.15,.47,.68],[.60,.40,.41]],
-  [[-.60,.40,.38],[-.19,.48,.57],[.28,.47,.92],[.70,.30,.48]],
-  [[-.66,.34,.35],[-.33,.46,.60],[.08,.52,.48],[.55,.45,.35]]
+  [[-.58,.05,-.03,.46,.40,.45],[-.20,.29,.04,.54,.59,.46],
+   [.28,.25,-.20,.49,.49,.53],[.63,.06,.06,.44,.35,.38],[-.16,.04,.34,.42,.31,.35]],
+  [[-.64,.03,.10,.41,.29,.36],[-.26,.18,-.18,.52,.43,.47],
+   [.18,.37,.03,.52,.68,.51],[.60,.10,.03,.45,.40,.41],[.19,.11,.34,.41,.36,.34]],
+  [[-.68,.04,-.07,.43,.28,.42],[-.32,.15,.15,.48,.41,.47],
+   [.12,.17,-.18,.55,.42,.53],[.56,.09,.12,.52,.35,.41],[.27,-.01,.37,.34,.23,.31]]
 ];
 
 function cloudVolume(profile) {
-  const slices=28, sides=16;
-  const vertices=[],indices=[],colors=[];
-  const underside=new THREE.Color(0xb0bed9), shade=new THREE.Color(0xd4dff0);
-  const light=new THREE.Color(0xfff9e9), tint=new THREE.Color();
-  function vertex(x,y,z,tone){
-    vertices.push(x,y,z);
-    tint.copy(underside).lerp(shade,THREE.MathUtils.smoothstep(tone,-.42,.05));
-    tint.lerp(light,THREE.MathUtils.smoothstep(tone,.18,.32));
+  // Projetar uma única casca sobre os gomos mantém a silhueta contínua de todos os ângulos.
+  const geometry=new THREE.SphereGeometry(1,40,24);
+  const position=geometry.attributes.position;
+  const colors=[],tint=new THREE.Color();
+  const shade=new THREE.Color(0xa4b4cf), body=new THREE.Color(0xe5eaf0), light=new THREE.Color(0xfffaeb);
+  const lobes=[[0,0,0,.96,.32,.53],...profile];
+  const direction=new THREE.Vector3();
+  for(let i=0;i<position.count;i++){
+    direction.fromBufferAttribute(position,i);
+    const {x,y,z}=direction;
+    let radius=0;
+    for(const [cx,cy,cz,rx,ry,rz] of lobes){
+      const a=(x/rx)**2+(y/ry)**2+(z/rz)**2;
+      const b=x*cx/rx**2+y*cy/ry**2+z*cz/rz**2;
+      const c=(cx/rx)**2+(cy/ry)**2+(cz/rz)**2-1;
+      const disc=b*b-a*c;
+      if(disc<0)continue;
+      const outer=(b+Math.sqrt(disc))/a;
+      const overlap=Math.max(0,.065-Math.abs(radius-outer));
+      radius=Math.max(radius,outer)+overlap*overlap/.26;
+    }
+    const py=y*radius;
+    const underside=py<0?py*.62:py;
+    position.setXYZ(i,x*radius,underside,z*radius);
+    const relief=py+.11*Math.sin(8*x*radius+3*z)*Math.cos(5*z*radius)-.08*x;
+    tint.copy(shade).lerp(body,THREE.MathUtils.smoothstep(relief,-.22,.16));
+    tint.lerp(light,THREE.MathUtils.smoothstep(relief,.18,.49));
     colors.push(tint.r,tint.g,tint.b);
   }
-  vertex(-1,0,0,0);
-  for(let i=1;i<slices;i++){
-    const x=2*i/slices-1;
-    const taper=Math.sqrt(1-x*x);
-    let roof=.15*taper;
-    for(const [center,width,height] of profile){
-      const u=(x-center)/width;
-      roof=Math.max(roof,height*Math.sqrt(Math.max(0,1-u*u)));
-    }
-    for(let j=0;j<sides;j++){
-      const angle=j*Math.PI*2/sides, up=Math.cos(angle), across=Math.sin(angle);
-      const y=up>=0?up*roof:-.19*taper*Math.pow(-up,.58);
-      const z=across*(.38*taper+.15*roof);
-      vertex(x,y,z,up*.72+across*.15-x*.12);
-    }
-  }
-  const end=vertices.length/3;
-  vertex(1,0,0,0);
-  for(let j=0;j<sides;j++){
-    const a=1+j,b=1+(j+1)%sides;
-    indices.push(0,b,a);
-    for(let i=0;i<slices-2;i++){
-      const left=a+i*sides,next=b+i*sides;
-      indices.push(left,next,left+sides,next,next+sides,left+sides);
-    }
-    indices.push(end,a+(slices-2)*sides,b+(slices-2)*sides);
-  }
-  const geometry=new THREE.BufferGeometry();
-  const position=new THREE.Float32BufferAttribute(vertices,3);
-  geometry.setAttribute('position',position);
   geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  geometry.setIndex(indices);geometry.computeVertexNormals();
+  geometry.computeVertexNormals();
   // O temporal engrossa a base e alarga o topo para formar uma bigorna a sotavento.
   const fair=position.array.slice();
   let lastStorm=0;
@@ -150,6 +142,11 @@ export function cloudField(scene,random) {
     }));
     const mesh=new THREE.InstancedMesh(geometry,material,layout.length);
     mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const variation=new THREE.Color();
+    for(let i=0;i<layout.length;i++){
+      const warmth=.5+.5*Math.sin(layout[i].x);
+      mesh.setColorAt(i,variation.setRGB(.94+.06*warmth,.96+.03*warmth,1-.04*warmth));
+    }
     group.add(mesh);return {mesh,layout,shape};
   });
   const curtain=new THREE.Mesh(new THREE.CylinderGeometry(195,197,48,64,1,true),

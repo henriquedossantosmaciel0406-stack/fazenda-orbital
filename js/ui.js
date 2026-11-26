@@ -431,25 +431,49 @@ export function toggleInventory() {
 // ---------- Pausa, configuracoes, estatisticas, conquistas ----------
 let adminSession=false;
 function openAdmin(){
-  openModal({id:'admin',title:'Observatório · ADM',hint:'Comandos para sua fazenda. Em sala, o anfitrião transmite o clima.',build(body){
-    const list=el('div','menu-list');body.append(list);
-    for(const id of ['rain','tempest','aurora','meteor']){
-      const b=menuButton(CONFIG.events[id].name,async()=>{
-        b.disabled=true;
-        const {netInfo}=await import('./net.js');
-        if(id!=='meteor' && netInfo().mode==='guest'){
-          b.disabled=false;showToast('Crie a sala para controlar o clima.','info');return;
-        }
-        const r=await api('admin',{event:id});
-        b.disabled=false;
-        if(!r.ok){showToast(r.error,'bad');return;}
-        if(modalId()!=='admin')return;
-        const {triggerEvent}=await import('./events.js');
-        closeModal();triggerEvent(r.event);save();
-      });
-      list.append(b);
+  const hours={dawn:6,noon:12,sunset:18,night:22};
+  const groups=[
+    ['Clima e eventos',[['clear','Abrir o céu'],...['rain','tempest','aurora','rainbow','festival','meteor'].map(id=>[id,CONFIG.events[id].name])]],
+    ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
+    ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia']]]
+  ];
+  let pending=false;
+  openModal({id:'admin',title:'Observatório · ADM',hint:'Quem cria a sala controla o clima e a hora. O pomar e os recursos são da sua conta.',build(body){
+    for(const [name,commands] of groups){
+      body.append(section(name));
+      const list=el('div','menu-list');body.append(list);
+      for(const [id,label] of commands){
+        const isEvent=Object.hasOwn(CONFIG.events,id);
+        list.append(menuButton(label,async()=>{
+          if(pending)return;
+          pending=true;
+          try{
+            const {netInfo}=await import('./net.js');
+            const local=['orchard','refill','meteor'].includes(id);
+            if(!local && netInfo().mode==='guest'){showToast('Crie a sala para controlar o céu.','info');return;}
+            const result=await api('admin',isEvent?{event:id}:{command:id});
+            if(!result.ok){showToast(result.error,'bad');return;}
+            if(modalId()!=='admin'||(!local && netInfo().mode==='guest'))return;
+            const {triggerEvent,endClimate}=await import('./events.js');
+            if(result.event)triggerEvent(result.event);
+            else if(result.command==='clear')endClimate();
+            else if(Object.hasOwn(hours,result.command))state.time=hours[result.command];
+            else if(result.command==='refill'){
+              state.water=waterCap();state.energy=maxEnergy();
+            }else if(result.command==='orchard'){
+              if(!state.trees.length){showToast('Plante uma muda primeiro.','info');return;}
+              for(const tree of state.trees){
+                const def=CONFIG.trees[tree.type];
+                tree.progress=def.growTime;tree.fruits=def.maxFruits;tree.fruitT=0;
+              }
+            }
+            closeModal();save();
+            if(!result.event)showToast(label+' · concluído','good');
+          }finally{pending=false;}
+        }));
+      }
     }
-    list.append(menuButton('Voltar',openPauseMenu,'secondary'));
+    body.append(menuButton('Voltar',openPauseMenu,'secondary'));
   }});
 }
 function menuButton(label, fn, cls = '') {
