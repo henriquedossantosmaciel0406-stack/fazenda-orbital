@@ -1,13 +1,15 @@
 // Drones agricolas: modelo 3D, IA simples (regar, colher, replantar), bateria, carregamento e painel de status.
 import * as THREE from 'three';
-import { state, bus, stockFree, droneLimit, hasResearch, maxEnergy } from './state.js';
+import { state, bus, stockFree, droneLimit, hasResearch, maxEnergy, walletLabel } from './state.js';
 import { CONFIG } from './config.js';
 import { geo, mat, glow } from './world.js';
 import { addOutline } from './toon.js';
 import { researchDroneSpeed, researchDroneDrain } from './research.js';
 import { burst } from './effects.js';
 import { setDroneHum, play } from './audio.js';
-import { showToast, openModal, row, section, progressBar, el } from './ui.js';
+import { showToast, openModal, row, section, progressBar, el, makeTabs } from './ui.js';
+
+import { modules, moduleLevel, moduleValue, installModule } from './drone-upgrades.js';
 
 const D = CONFIG.drone;
 const entities = [];
@@ -76,7 +78,7 @@ function createEntity(data, index) {
 export function initDrones(currentScene, gameApi, currentWorld) {
   scene = currentScene; api = gameApi; world = currentWorld;
   pumpSpot = { x: world.pumpPosition.x, z: world.pumpPosition.z + 1.4, claimedBy: 0, kind: 'pump' };
-  state.drones.forEach((d, i) => { d.energy = Math.min(d.energy, D.cap); createEntity(d, i); });
+  state.drones.forEach((d, i) => { d.energy = Math.min(d.energy, moduleValue(d, 'battery')); createEntity(d, i); });
 }
 
 export function buyDrone() {
@@ -185,7 +187,8 @@ function moveTo(e, tx, ty, tz, dt, speed) {
 function updateOne(e, dt, t) {
   const d = e.data, p = e.group.position;
   const pad = world.dronePads[e.padIndex % world.dronePads.length];
-  const speed = D.speed * researchDroneSpeed();
+  const capacity = moduleValue(d, 'battery');
+  const speed = D.speed * researchDroneSpeed() * moduleValue(d, 'motor');
   let flying = false;
 
   if (d.status === 'dead') {
@@ -200,10 +203,10 @@ function updateOne(e, dt, t) {
     const dist = moveTo(e, pad.x, pad.y + 0.35, pad.z, dt, speed);
     flying = dist > 0.4;
     if (!flying) {
-      const amt = Math.min(D.chargeRate * dt, state.energy, D.cap - d.energy);
+      const amt = Math.min(D.chargeRate * dt, state.energy, capacity - d.energy);
       if (amt > 0) { d.energy += amt; state.energy -= amt; e.taskText = 'Carregando'; }
       else if (state.energy < 0.1 && d.energy < 1) { d.status = 'dead'; e.taskText = 'Sem energia'; }
-      if (d.energy >= D.cap * 0.95) { d.status = 'active'; e.returning = false; e.taskText = 'Aguardando'; }
+      if (d.energy >= capacity * 0.95) { d.status = 'active'; e.returning = false; e.taskText = 'Aguardando'; }
     } else d.energy = Math.max(0, d.energy - D.drain * 0.5 * dt);
   } else {
     // ATIVO
@@ -212,7 +215,7 @@ function updateOne(e, dt, t) {
     d.energy -= (e.task || e.returning ? drain : D.idleDrain) * dt;
     if (d.energy <= 0) { die(e); return; }
     if (!e.task && !e.returning) {
-      if (d.energy < D.cap * 0.22) { e.returning = true; e.taskText = 'Voltando a base'; }
+      if (d.energy < capacity * 0.22) { e.returning = true; e.taskText = 'Voltando a base'; }
       else if (e.thinkIn === undefined || (e.thinkIn -= dt) <= 0) { e.thinkIn = 0.6; chooseTask(e); }
     }
     if (e.returning) {
@@ -227,7 +230,7 @@ function updateOne(e, dt, t) {
           e.work += dt;
           e.spark -= dt;
           if (e.spark <= 0) { e.spark = 0.18; burst(plot.x, 1.3, plot.z, e.task.type === 'water' || e.task.type === 'refill' ? 0x4FC3F7 : 0xFFD166, 2, 0.8, 0.5); }
-          if (e.work >= 0.9) {
+          if (e.work >= moduleValue(d, 'arm')) {
             const tk = e.task;
             let ok = false;
             if (tk.type === 'treeWater') ok = api.waterTree(plot, true);
@@ -277,11 +280,45 @@ export function updateDrones(dt, camera, t) {
   setDroneHum(level, 1);
 }
 
+function showWorkshop(body) {
+  body.append(el('div', 'summary', 'Saldo disponível · ' + walletLabel() + ' CR'));
+  if (!state.drones.length) {
+    body.append(el('p', 'hint', 'Compre seu primeiro drone na Loja Geral a partir do nível ' + D.level + '.'));
+  }
+  state.drones.forEach((unit, i) => {
+    body.append(section('Drone ' + (i + 1)));
+    const list = el('div', 'list');
+    for (const [key, part] of Object.entries(modules)) {
+      const level = moduleLevel(unit, key);
+      const price = part.prices[level];
+      const current = part.format(part.value(level));
+      const maxed = price === undefined;
+      list.append(row({
+        title: part.name, tag: 'Nv. ' + level + ' / ' + part.prices.length,
+        desc: maxed ? current : current + ' → ' + part.format(part.value(level + 1)),
+        buttons: [{
+          label: maxed ? 'Nível máximo' : 'Instalar · ' + price + ' CR',
+          disabled: maxed || state.money < price,
+          onClick: () => {
+            if (installModule(unit, key, level)) {
+              play('upgrade');
+              showToast('Upgrade instalado no drone ' + (i + 1), 'good');
+            }
+          }
+        }]
+      }));
+    }
+    body.append(list);
+  });
+}
+
 // ---------- Painel de status ----------
 export function openDronePanel() {
   openModal({
-    id: 'drones', title: 'Drones agricolas', wide: true, hint: 'Pressione G, E ou ESC para fechar',
-    build(body) {
+    id: 'drones', title: 'Drones agrícolas', wide: true, hint: 'Pressione G, E ou ESC para fechar',
+    build(panel) {
+      const { box: body, index } = makeTabs(panel, ['Frota', 'Oficina de upgrades']);
+      if (index === 1) { showWorkshop(body); return; }
       const sum = el('div', 'summary');
       sum.append(el('span', null, 'ENERGIA DA FAZENDA'), el('b', null, Math.floor(state.energy) + ' / ' + maxEnergy()));
       body.append(sum);
@@ -295,6 +332,7 @@ export function openDronePanel() {
       const list = el('div', 'list');
       state.drones.forEach((d, i) => {
         const e = entityOf(d);
+        const capacity = moduleValue(d, 'battery');
         const tagCls = d.status === 'dead' ? 'bad' : d.status === 'charging' ? 'gold' : 'good';
         const buttons = [];
         if (d.status === 'dead') buttons.push({ label: 'Recuperar', onClick: () => { recoverDrone(d); } });
@@ -302,7 +340,7 @@ export function openDronePanel() {
         list.append(row({
           title: 'Drone ' + (i + 1), tag: droneStatusLabel(d), tagCls,
           desc: 'Tarefa: ' + (e ? e.taskText : '-'),
-          bar: { frac: d.energy / D.cap, cls: d.energy < D.cap * 0.25 ? 'low' : 'energy', text: 'Bateria ' + Math.floor(d.energy) + ' / ' + D.cap },
+          bar: { frac: d.energy / capacity, cls: d.energy < capacity * 0.25 ? 'low' : 'energy', text: 'Bateria ' + Math.floor(d.energy) + ' / ' + capacity },
           buttons
         }));
       });
