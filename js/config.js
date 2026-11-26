@@ -13,8 +13,11 @@ export const CONFIG = {
   crystalPrice: 70,
   farmArea: { x0: -100, x1: -10, z0: -100, z1: 14 },
 
-  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus'],
+  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus', 'radish', 'okra', 'pineapple'],
   crops: {
+    radish:     { name: 'Rabanete rubi', short: 'RUB', seedCost: 6, sellPrice: 17, growTime: 20, waterUse: 1, color: 0xE44E7F, level: 1, xp: 8, rp: 1 },
+    okra:       { name: 'Quiabo de órbita', short: 'QUI', seedCost: 42, sellPrice: 136, growTime: 76, waterUse: 2, color: 0x8BDF89, level: 4, xp: 30, rp: 2 },
+    pineapple:  { name: 'Abacaxi eclipse', short: 'ABA', seedCost: 180, sellPrice: 650, growTime: 200, waterUse: 5, color: 0xF8AA39, level: 7, xp: 112, rp: 6 },
     lettuce:    { name: 'Alface',            short: 'ALF', seedCost: 5,   sellPrice: 14,   growTime: 18,  waterUse: 1, color: 0x7ED957, level: 1,  xp: 8,   rp: 1 },
     strawberry: { name: 'Morango',           short: 'MOR', seedCost: 12,  sellPrice: 38,   growTime: 35,  waterUse: 2, color: 0xFF6FA5, level: 1,  xp: 12,  rp: 1 },
     carrot:     { name: 'Cenoura solar',     short: 'CEN', seedCost: 8,   sellPrice: 26,   growTime: 26,  waterUse: 1, color: 0xFF8A2A, level: 2,  xp: 10,  rp: 1 },
@@ -40,8 +43,10 @@ export const CONFIG = {
   mutationOrder: ['rainbow', 'crystal', 'shadow', 'golden', 'giant'], // checadas da mais rara para a mais comum
 
   // Arvores frutiferas: plantadas em qualquer lugar livre; dao varios frutos repetidamente.
-  treeOrder: ['apple', 'orange', 'peach', 'cherry', 'coconut', 'crystaltree'],
+  treeOrder: ['apple', 'orange', 'peach', 'cherry', 'coconut', 'crystaltree', 'pear', 'starfruit'],
   trees: {
+    pear:        { name: 'Pereira de névoa', fruit: 'Pera de névoa', short: 'PER', saplingCost: 240, level: 4, growTime: 102, fruitEvery: 24, maxFruits: 5, price: 32, crown: 0x6AB29E, fruitColor: 0xDEE984, xp: 4 },
+    starfruit:   { name: 'Caramboleira astral', fruit: 'Carambola astral', short: 'AST', saplingCost: 880, level: 9, growTime: 168, fruitEvery: 48, maxFruits: 7, price: 185, crown: 0x538A64, fruitColor: 0xFFBC3D, xp: 9 },
     apple:       { name: 'Macieira cristal',  fruit: 'Maca cristal',  short: 'MAC', saplingCost: 120,  level: 3,  growTime: 80,  fruitEvery: 28, maxFruits: 6, price: 22,  crown: 0x4FBF68, fruitColor: 0xFF4D5E, xp: 3 },
     orange:      { name: 'Laranjeira solar',  fruit: 'Laranja solar', short: 'LAR', saplingCost: 200,  level: 4,  growTime: 95,  fruitEvery: 30, maxFruits: 6, price: 38,  crown: 0x3FAF5A, fruitColor: 0xFFA020, xp: 4 },
     peach:       { name: 'Pessegueiro lunar', fruit: 'Pessego lunar', short: 'PES', saplingCost: 320,  level: 5,  growTime: 110, fruitEvery: 34, maxFruits: 7, price: 56,  crown: 0xFFB6D0, fruitColor: 0xFFC49A, xp: 5 },

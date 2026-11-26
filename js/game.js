@@ -760,7 +760,7 @@ function openGeneralStore() {
       const c = CONFIG.crops[k], locked = state.level < c.level;
       return {
         thumb:k, color: c.color, title: 'Semente de ' + c.name,
-        species: {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática'}[k],
+        species: {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática',radish:'Raiz arredondada',okra:'Vagem estriada',pineapple:'Fruto de coroa'}[k],
         growing: [['Colheita',c.growTime+' s'],['Água',c.waterUse],['Venda',c.sellPrice+' CR']],
         desc: 'Pacote de sementes · '+c.seedCost+' CR por unidade',
         tag: locked ? 'NIVEL ' + c.level : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,

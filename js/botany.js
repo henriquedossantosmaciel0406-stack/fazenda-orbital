@@ -77,7 +77,7 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
   const {leaf,rod,oval,gem,part}=tools(group,leafKind);
   const base=CONFIG.crops[key].color;
   const col=sick ? 0xB99550 : mutation ? blend(base,mutation.color,0.65) : base;
-  const greens={lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
+  const greens={radish:0x51894F,okra:0x37865F,pineapple:0x3E877D,lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
   const fern=sick?0x817346:greens[key],mint=sick?0xADA053:blend(fern,0xEBF997,.48);
   const scale=0.32+0.68*g, ripe=g>0.55;
   group.scale.setScalar(scale);
@@ -95,6 +95,41 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
       const tint=blend(col,sick?0xc4ad69:0xdaf396,.12+layer*.67);
       const m=part(lettuceBlade,tint,Math.sin(angle)*offset,.06+layer*.35,Math.cos(angle)*offset,span,span,span);
       m.rotation.set(.55-layer*1.15,angle,0,'YXZ');
+    }
+  } else if (key==='radish') {
+    for(let j=0;j<3;j++){
+      const a=j*TAU/3,x=.46*Math.sin(a),z=.46*Math.cos(a);
+      const size=.13+.18*g;
+      oval(x,.14,z,size,size*.88,size,col);
+      rod([x,.14,z],[x+.06,-.12,z],size*.62,0xF2D9C5,.08);
+      for(let k=0;k<4;k++)leaf(x,.14+size*.8,z,a+k*spiral,.47,.12,.45+.18*k,k%2?mint:fern);
+    }
+  } else if (key==='okra') {
+    rod([0,0,0],[0,1.75,0],.067,fern);
+    for(let j=0;j<5;j++){
+      const a=j*spiral,y=.46+j*.24,x=.31*Math.sin(a),z=.31*Math.cos(a);
+      rod([0,y-.2,0],[x,y,z],.035,fern);
+      leaf(x,y,z,a,.55,.16,.19,mint);
+      if(ripe) {
+        rod([x,y,z],[x*1.46,y+.48,z*1.46],.115,col,.16);
+        gem(x,y+.045,z,.13,.08,.13,fern);
+      }else if(g>.25)blossom(x,y+.02,z,.18,0xFFF0AE);
+    }
+  } else if (key==='pineapple') {
+    ring(0,.13,0,11,1,.13,.42,fern);
+    ring(0,.21,0,8,.77,.12,.73,mint,.31);
+    if(g>.35){
+      rod([0,.13,0],[0,.7,0],.09,fern);
+      const rind=ripe?col:fern;
+      oval(0,.88,0,.35,.51,.35,rind);
+      for(let j=0;j<4;j++)for(let k=0;k<8;k++){
+        const a=(k+.5*(j%2))*TAU/8,y=.59+j*.19;
+        const r=.35*Math.sqrt(1-((y-.88)/.51)**2);
+        const eye=gem(r*Math.sin(a),y,r*Math.cos(a),.083,.10,.04,blend(rind,0xA7612A,.43));
+        eye.rotation.y=a;
+      }
+      ring(0,1.32,0,8,.43,.072,.91,fern);
+      ring(0,1.38,0,5,.38,.06,1.16,mint,.3);
     }
   } else if (key==='carrot') {
     for(let j=0;j<3;j++) {
@@ -184,7 +219,7 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
 const fruitSkins=new Map();
 function fruitSkin(type) {
   if(fruitSkins.has(type))return fruitSkins.get(type);
-  const shape=new THREE.SphereGeometry(1,16,12);
+  const shape=new THREE.SphereGeometry(1,type==='starfruit'?20:16,12);
   const pos=shape.attributes.position;
   for(let i=0;i<pos.count;i++){
     const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
@@ -193,6 +228,10 @@ function fruitSkin(type) {
     if(type==='apple'){
       width=1+.14*y+.045*Math.cos(5*angle)*(1-y*y);
       height=y-.22*Math.max(0,y)**10+.08*Math.max(0,-y)**9;
+    }else if(type==='pear'){
+      width=1-.52*y-.16*Math.exp(-10*(y-.55)**2);
+    }else if(type==='starfruit'){
+      width=.79+.28*Math.cos(angle*5);
     }else if(type==='peach'){
       const crease=Math.exp(-18*x*x)*Math.max(0,z);
       width=1+.13*y-.16*crease;
@@ -206,7 +245,7 @@ function fruitSkin(type) {
 }
 
 const fruitSize={
-  apple:[.27,.28,.26],orange:[.245,.235,.245],peach:[.28,.29,.25],
+  pear:[.22,.36,.22],starfruit:[.30,.37,.30],apple:[.27,.28,.26],orange:[.245,.235,.245],peach:[.28,.29,.25],
   cherry:[.164,.15,.16],coconut:[.225,.32,.205],crystaltree:[.195,.34,.195]
 };
 
@@ -251,7 +290,7 @@ function addRipeFruit(group,type,anchor,angle,slot) {
 }
 
 const crowns = {
-  apple: [5,1.05,1.75,0.70,0.73], orange:[7,0.82,2.05,0.60,0.93],
+  pear:[5,.75,2.45,.57,.83],starfruit:[7,1.35,1.70,.52,.38],apple: [5,1.05,1.75,0.70,0.73], orange:[7,0.82,2.05,0.60,0.93],
   peach:[4,1.27,1.48,0.80,0.49], cherry:[8,1.46,2.06,0.62,0.38],
   coconut:[9,1.2,3.1,0,0], crystaltree:[6,0.95,1.85,0.41,1.04]
 };
@@ -278,7 +317,12 @@ export function fillTree(P,type,g,fruits) {
       anchors.push([lean+dx*0.47,h-0.21,dz*0.47]);
     } else {
       rod([lean*0.4,h*0.56,0],[x,y,z],0.115,bark,0.36);
-      if(ice) { const crystal=gem(x,y+0.25,z,w,depth,w,tint); crystal.rotation.z=-dx*0.35; crystal.rotation.x=dz*0.35; }
+      if(type==='starfruit'){
+        for(let j=0;j<4;j++){
+          const t=(j+1)/4;
+          for(const side of [-1,1])leaf(lean+dx*radius*t,h*.56+(y-h*.56)*t,dz*radius*t,a+side*.92,.66,.16,-.12,tint);
+        }
+      }else if(ice) { const crystal=gem(x,y+0.25,z,w,depth,w,tint); crystal.rotation.z=-dx*0.35; crystal.rotation.x=dz*0.35; }
       else {
         const canopy=part(geo('ico',1,1),tint,x,y+0.32,z,w,depth,w*0.87); canopy.rotation.y=a;
         for(let j=0;j<3;j++) leaf(x,y+0.32+depth*0.64,z,a+j*2.1,w*1.23,0.21,0.28,blend(tint,0xffe390,0.21));
@@ -293,7 +337,7 @@ export function fillTree(P,type,g,fruits) {
       anchors.push([x+dx*w*0.68,y+0.19-depth*0.55,z+dz*w*0.68]);
     }
   }
-  if(!palm) {
+  if(!palm && type!=='starfruit') {
     if(ice) gem(lean,h+0.72,0,0.51,1.21,0.51,def.crown);
     else part(geo('ico',1,1),def.crown,lean,h+0.61,0,w*1.45,depth*1.21,w*1.4);
   }
