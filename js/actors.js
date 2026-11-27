@@ -76,6 +76,7 @@ export function animateFarmer(root,t,walk,air=0){
 }
 
 export const PETS={
+  dragon:{name:'Dragão de obsidiana',cost:0,admin:true,desc:'Exclusivo de Rick. Velocidade tripla, crescimento e rega em dobro, mais 200 espaços de estoque.'},
   cat:{name:'Gato malhado',cost:0,desc:'Gato de botas claras e cauda em gancho.'},
   dog:{name:'Corgi caramelo',cost:160,desc:'Patinhas curtas e lenço de explorador.'},
   rabbit:{name:'Coelho da lua',cost:240,desc:'Orelha caída e patas largas para saltar.'},
@@ -113,7 +114,37 @@ const anatomies={
   turtle:{head:[0,.24,.39],tail:[0,.19,-.39],torso:[[-.43,.22,.10,.08],[-.26,.23,.31,.15],[.12,.23,.32,.15],[.36,.22,.18,.10]]},
   axolotl:{head:[0,.23,.32],tail:[0,.18,-.32],torso:[[-.38,.18,.06,.07],[-.15,.18,.15,.13],[.13,.19,.19,.14],[.33,.19,.16,.10]]}
 };
+function obsidianDragon(){
+  const root=new THREE.Group(),body=pivot(root,0,0,0),core=pivot(body,0,0,0);
+  const black=0x282430,scarlet=0xca2438,ember=0xff7449;
+  profile(core,black,[[-.50,.40,.07,.08],[-.28,.44,.22,.22],[.08,.49,.24,.28],[.30,.60,.15,.22]]);
+  oval(core,scarlet,0,.46,.17,.16,.19,.13);
+  const head=pivot(body,0,.71,.33),tail=pivot(body,0,.41,-.42),legs=[],wings=[];
+  profile(head,black,[[-.19,.06,.12,.12],[-.05,.10,.23,.21],[.12,.07,.19,.15],[.36,.025,.12,.075]]);
+  for(const side of [-1,1]){
+    oval(head,ember,side*.168,.13,.125,.055,.027,.042);
+    piece(head,geo('cone',.071,.32,6),scarlet,side*.14,.32,-.08).rotation.x=-.52;
+    const wing=pivot(body,side*.15,.63,-.05);wings.push(wing);
+    const points=[[0,0,0],[.35,.46,.06],[.82,.34,-.18],[.65,.10,-.17],[.56,.09,-.39],[.33,.11,-.29],[.16,.04,-.43]];
+    const geom=new THREE.BufferGeometry();geom.setAttribute('position',new THREE.Float32BufferAttribute(points.flatMap(([x,y,z])=>[side*x,y,z]),3));
+    const faces=[0,1,5,1,2,3,1,3,4,1,4,5,0,5,6];geom.setIndex([...faces,...faces.slice().reverse()]);geom.computeVertexNormals();
+    piece(wing,geom,scarlet,0,0,0);
+    for(const [a,b] of [[0,1],[1,2],[1,4],[1,5]]){
+      const vec=i=>new THREE.Vector3(points[i][0]*side,points[i][1],points[i][2]);
+      const start=vec(a),end=vec(b),delta=end.clone().sub(start),mid=start.clone().lerp(end,.5);
+      piece(wing,geo('cyl',.012,.026,delta.length(),5),black,mid.x,mid.y,mid.z).quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+    }
+    batch(wing);
+    for(const z of [-.26,.18]){
+      const leg=pivot(body,side*.14,.30,z);oval(leg,black,0,-.08,0,.07,.14,.08);oval(leg,scarlet,0,-.19,.04,.06,.04,.10);batch(leg);legs.push(leg);
+    }
+  }
+  profile(tail,black,[[-.63,.16,.01,.024],[-.40,.08,.054,.07],[-.20,.02,.09,.10],[0,0,.13,.12]]);
+  for(let i=0;i<4;i++)piece(core,geo('cone',.064,.13,5),ember,0,.63+i*.044,-.32+i*.15);
+  batch(core);batch(head);batch(tail);root.userData.pet={body,head,tail,legs,wings,type:'dragon'};return root;
+}
 export function makePet(type){
+  if(type==='dragon')return obsidianDragon();
   const root=new THREE.Group(),body=pivot(root,0,0,0),core=pivot(body,0,0,0);
   const spec=anatomies[type],head=pivot(body,...spec.head),tail=pivot(body,...spec.tail);
   const fur=coats[type],legs=[],low=type==='turtle'||type==='axolotl';
@@ -213,7 +244,10 @@ export function followPet(pet,owner,dt,t,world){
   data.body.position.y=Math.abs(step)*pace*(data.type==='rabbit'?.18:.035);
   data.body.rotation.z=0;
   data.head.rotation.y=0;
-  if(data.type==='cat'){
+  if(data.type==='dragon'){
+    data.body.position.y=.44+.10*Math.sin(t*4);
+    data.wings.forEach((w,i)=>w.rotation.z=(i?1:-1)*.53*Math.sin(t*(4+pace*2)));
+  }else if(data.type==='cat'){
     data.head.rotation.y=idle*.34*Math.sin(t*1.8);
     data.tail.rotation.x=.16*Math.sin(t*2.4);
   }else if(data.type==='dog'){

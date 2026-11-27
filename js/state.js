@@ -62,12 +62,22 @@ export const state = {
 
 // ---------- Derivados ----------
 let special = false;
+export const hasOrbitalPass=()=>special;
+export const dragonActive=()=>special && state.activePet==='dragon';
 export function enableOrbitalPass(pets) {
   if (special) return;
   special = true;
   state.level = Math.max(100, state.level);
   state.islandUnlocked = true;
+  if(!state.adoptedPets.includes('dragon'))state.activePet='dragon';
   state.adoptedPets = [...pets];
+  state.prestige.rank=Math.max(10,state.prestige.rank);
+  state.prestige.stars=Math.max(9999,state.prestige.stars);
+  state.prestige.total=Math.max(state.prestige.total,state.prestige.stars);
+  for(const skill of CONFIG.prestige.perks)state.prestige.upgrades[skill.id]=skill.max+Math.max(0,state.prestige.rank-3);
+  state.rp=Math.max(9999,state.rp);
+  state.speedLevel=CONFIG.upgrades.speed.max;
+  state.yieldLevel=CONFIG.upgrades.yield.max;
   state.maxWater = Math.max(50,state.maxWater);
   state.water = state.maxWater;
   state.crystals = Math.max(9999,state.crystals);
@@ -95,7 +105,7 @@ export function reputation() {
 export const perk = id => (state.prestige && state.prestige.upgrades[id]) || 0;
 export const cropUnlocked = c => state.level >= c.level && state.prestige.rank >= (c.prestige || 0);
 export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market') + 0.04 * perk('cash'));
-export const stockLimit = () => CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
+export const stockLimit = () => (dragonActive()?200:0) + CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
 export const maxEnergy = () => CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
 export function stockUsed() {
   let n = 0;
@@ -106,7 +116,7 @@ export function stockUsed() {
   return n;
 }
 export const treeLimit = () => CONFIG.baseTreeLimit + 4 * state.land.orchard;
-export const soilGrowth = () => (1 + 0.08 * state.land.soil)*(state.activePet==='turtle'?1.2:1);
+export const soilGrowth = () => (1 + 0.08 * state.land.soil)*(dragonActive()?2:state.activePet==='turtle'?1.2:1);
 export const soilDouble = () => 0.05 * state.land.soil;
 export const mutKey = (m, c) => m + ':' + c;
 export const stockFree = () => Math.max(0, stockLimit() - stockUsed());

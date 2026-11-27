@@ -3,7 +3,7 @@ import {touchesSolid} from './collision.js';
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { CONFIG } from './config.js';
-import { state, HOTBAR } from './state.js';
+import { state, HOTBAR, dragonActive } from './state.js';
 import { selectSlot, nextPage, isModalOpen } from './ui.js';
 import { play } from './audio.js';
 
@@ -114,7 +114,7 @@ export function createPlayer(camera, dom) {
       camera.position.y = CONFIG.player.height+lift;
       if (!forward && !right) { stepTimer = 0.15; return; }
       const running = !!(keys.ShiftLeft || keys.ShiftRight);
-      const speed = CONFIG.player.speed * (state.activePet==='fox'?1.15:1) * (running ? CONFIG.player.runMultiplier : 1) * (1 + (state.speedLevel - 1) * 0.12);
+      const speed = CONFIG.player.speed * (dragonActive()?3:state.activePet==='fox'?1.15:1) * (running ? CONFIG.player.runMultiplier : 1) * (1 + (state.speedLevel - 1) * 0.12);
       camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
       // frente = fwd, direita = (-fz, fx)
       let dx = fwd.x * forward + -fwd.z * right, dz = fwd.z * forward + fwd.x * right;

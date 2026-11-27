@@ -8,12 +8,14 @@ export async function connectHttpRoom(op,code,handlers){
     if(!response.ok||!body.ok)throw Object.assign(new Error(body.error||'Falha no servidor de salas.'),{status:response.status});
     return body;
   }
-  const {id,token,size}=await request({op});
+  const {id,token,size}=await request({op,compact:true});
   let active=true,timer,seq=1,after=0,pending=null,failures=0,alone=size===1;
   const queue=[];
-  let movingUntil=0;
+  const known={};
+  let lastPoll=0,movingUntil=0;
   let inFlight=false, due=Infinity, retrying=false;
   function schedule(ms){
+    ms=Math.max(ms,90-(performance.now()-lastPoll));
     const deadline=performance.now()+ms;
     if(!active || inFlight || deadline>=due)return;
     clearTimeout(timer);due=deadline;timer=setTimeout(poll,ms);
@@ -37,29 +39,34 @@ export async function connectHttpRoom(op,code,handlers){
   }
   async function poll(){
     if(!active||inFlight)return;
-    due=Infinity;inFlight=true;let delay;
+    due=Infinity;inFlight=true;lastPoll=performance.now();let delay;
     try{
       if(!pending){
         let n=0;pending=[];
         while(queue.length&&pending.length<48){const p=queue[0],len=JSON.stringify(p).length;if(n+len>160000&&pending.length)break;n+=len;pending.push(queue.shift());}
       }
-      const reply=await request({op:'poll',id,token,seq,after,packets:pending});
+      const reply=await request({op:'poll',id,token,seq,after,known,packets:pending});
       if(!active)return;
       seq++;pending=null;failures=0;retrying=false;alone=reply.size===1;
       for(const event of reply.events){
         if(!active)break;
         if(event.msg?.t==='pos')movingUntil=performance.now()+450;
-        after=event.cursor;if(event.admin)handlers.onAdmin(event.admin);else if(event.gone)handlers.onGone(event.from);else handlers.onMsg(event.from,event.msg);
+        after=event.cursor;if(event.admin)handlers.onAdmin(event.admin);else if(event.gone){delete known[event.from];handlers.onGone(event.from);}else if(event.msg?.t==='bye'){delete known[event.msg.id];handlers.onMsg(event.from,event.msg);}else handlers.onMsg(event.from,event.msg);
+      }
+      for(const pose of reply.poses||[]){
+        known[pose.id]=pose.version;
+        movingUntil=performance.now()+450;
+        handlers.onMsg(pose.from,pose.msg);
       }
       const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
-      const idleDelay=alone?650:performance.now()<movingUntil?55:130;
+      const idleDelay=alone?1500:performance.now()<movingUntil?95:300;
       delay=reply.events.length>=64||(!alone&&urgent)?12:idleDelay;
     }catch(e){
       if(!active)return;
-      if((e.status>=400&&e.status<500&&e.status!==429)||++failures>=7){
+      if((e.status>=400&&e.status<500&&e.status!==429)||++failures>=15){
         close();handlers.onGone();return;
       }
-      retrying=true;delay=Math.min(2500,250*2**failures);
+      retrying=true;delay=Math.min(4000,250*2**failures)+Math.random()*350;
     }finally{inFlight=false;if(active)schedule(delay||235);}
   }
   addEventListener('pagehide',close);schedule(10);

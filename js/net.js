@@ -18,10 +18,10 @@ import { showToast, openModal, closeModal, el, row, setNetChip } from './ui.js';
 import { play } from './audio.js';
 import { applyWorldCommand, restoreEventVisuals } from './events.js';
 
-const PREFIX = 'fazorb-v2-', MAX_REMOTE = 3;
+const PREFIX = 'fazorb-v2-', MAX_REMOTE = 5;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 // Deslocamento das fazendas dos outros jogadores (a cidade e a estrada ficam compartilhadas)
-const SLOT_OFFSET = [{ x: 245, z: 0 }, { x: 0, z: 345 }, { x: 245, z: 345 }];
+const SLOT_OFFSET = [{ x: 245, z: 0 }, { x: 0, z: 345 }, { x: 245, z: 345 }, { x: -245, z: 0 }, { x: -245, z: 345 }];
 const FARM_RECT = { x0: -104, x1: -4, z0: -104, z1: 18 };
 const LOCAL = new URLSearchParams(location.search).get('net') === 'local';
 
@@ -290,7 +290,7 @@ function handle(fromId, m) {
   if(m.t==='pos'&&N.tr?.directPoses&&fromId&&N.mode==='guest'&&(fromId!==m.id||!N.remotes.has(m.id)))return;
   if (m.t === 'hi' && (typeof m.nick !== 'string' || m.nick.length > 32)) return;
   if (m.t === 'farm' && !validSnapshot(m.s)) return;
-  if (m.t === 'full') { N.admission?.reject(new Error('Sala cheia (4 jogadores).')); showToast('Sala cheia (maximo de 4 jogadores)', 'bad'); leave(true); return; }
+  if (m.t === 'full') { N.admission?.reject(new Error('Sala cheia (6 jogadores).')); showToast('Sala cheia (máximo de 6 jogadores)', 'bad'); leave(true); return; }
   if (m.t === 'sync') {
     if (N.mode==='guest' && m.id===N.hostId && Number.isFinite(m.time) &&
         (!m.ev || (Object.hasOwn(CONFIG.events,m.ev.id) && Number.isFinite(m.ev.left))) &&

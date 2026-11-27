@@ -33,6 +33,12 @@ async function issue(req,res,a,remember){
   a.sessions.push({hash:hash(token),until:Date.now()+days*86400000});await write(a);
   cookie(req,res,a.nick+'.'+token,remember?days*86400:null);
 }
+function allowedSave(data,nick){
+  if(!data || nick.toLowerCase()==='rick')return data;
+  if(data.activePet==='dragon')data.activePet=null;
+  if(Array.isArray(data.adoptedPets))data.adoptedPets=data.adoptedPets.filter(k=>k!=='dragon');
+  return data;
+}
 const validSave=s=>s&&typeof s==='object'&&Array.isArray(s.plots)&&Number.isFinite(s.level);
 const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',save:a.save,revision:a.revision});
 function adminAction(a,data,roomOnly=false){
@@ -62,7 +68,7 @@ module.exports=async function api(req,res,route,attempt=0){
         const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
         recovery=crypto.randomBytes(16).toString('hex');
         if(await read(nick))throw fail(409,'Nick já cadastrado neste servidor.');
-        a={nick,salt,digest,recovery:hash(recovery),sessions:[],revision:validSave(data.initialSave)?1:0,save:validSave(data.initialSave)?data.initialSave:null};
+        a={nick,salt,digest,recovery:hash(recovery),sessions:[],revision:validSave(data.initialSave)?1:0,save:validSave(data.initialSave)?allowedSave(data.initialSave,nick):null};
       }else if(route==='login'){
         const digest=(await derive(pass,a?.salt||'orbital-unregistered')).toString('hex');
         a=await read(nick);if(!a||!equal(a.digest,digest))throw fail(401,'Nick ou senha incorretos.');
@@ -81,7 +87,7 @@ module.exports=async function api(req,res,route,attempt=0){
       if(data.nick!==a.nick)throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
       if(data.revision!==a.revision)throw fail(409,'Há progresso mais recente em outro navegador. Reabra o jogo para carregá-lo.');
       if(data.save!==null&&!validSave(data.save))throw fail(400,'Progresso inválido.');
-      a.save=data.save;a.revision++;await write(a);return send(200,{ok:true,revision:a.revision});
+      a.save=allowedSave(data.save,a.nick);a.revision++;await write(a);return send(200,{ok:true,revision:a.revision});
     }
     if(route==='logout'){a.sessions=a.sessions.filter(s=>s.hash!==key);await write(a);cookie(req,res,'',0);return send(200,{ok:true});}
     throw fail(404,'Rota desconhecida.');

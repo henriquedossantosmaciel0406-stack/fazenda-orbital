@@ -30,13 +30,35 @@ export function createWateringCan(camera) {
   hand.position.set(0.30,-0.27,-0.58);hand.scale.setScalar(0.39);
   let level=canLevel(state),can=canModel(level);can.rotation.y=0.12;hand.add(can);
   const glove=new THREE.Group();
-  function gripPart(color,x,y,z,w,h,d){
-    const m=new THREE.Mesh(geo('sph',1,10,7),mat(color));m.position.set(x,y,z);m.scale.set(w,h,d);glove.add(m);
+  glove.rotation.y=can.rotation.y;
+  const shell=0xf3edda, seam=0x324959, cuff=0x30848a;
+  const axis=new THREE.Vector3(0,1,0);
+  function pad(color,x,y,z,w,h,d){
+    const mesh=new THREE.Mesh(geo('sph',1,12,8),mat(color));
+    mesh.position.set(x,y,z);mesh.scale.set(w,h,d);glove.add(mesh);
+    return mesh;
   }
-  gripPart(0x397a88,.68,-.055,.19,.19,.13,.26);
-  gripPart(0xffe6c4,.52,.10,.085,.14,.135,.15);
-  for(let i=0;i<3;i++)gripPart(0xf3d4ad,.47,.18-i*.063,-.024,.083,.042,.067);
-  gripPart(0xffead1,.456,.213,.106,.09,.046,.062);
+  function segment(color,start,end,radius,thickness=1){
+    const a=new THREE.Vector3(...start),b=new THREE.Vector3(...end);
+    const center=a.clone().lerp(b,.5), direction=b.sub(a);
+    const mesh=pad(color,center.x,center.y,center.z,radius,direction.length()/2+radius*.65,radius*thickness);
+    mesh.quaternion.setFromUnitVectors(axis,direction.normalize());
+  }
+  segment(cuff,[.68,.02,.21],[.96,-.22,.56],.125);
+  segment(seam,[.65,.05,.16],[.72,-.01,.25],.136);
+  segment(0xf8b653,[.67,.036,.192],[.69,.019,.218],.134);
+  pad(shell,.584,.111,.099,.107,.155,.095).rotation.z=-.18;
+  pad(0x74b8ba,.619,.123,.173,.065,.097,.028).rotation.z=-.18;
+  // Four bent fingers follow the outer arc of the handle.
+  for(let i=0;i<4;i++){
+    const y=.224-i*.058, x=.31+.205*Math.sqrt(1-((y-.14)/.26)**2);
+    const radius=.033-i*.0015;
+    segment(shell,[.59,y,.09],[x+.007,y,.099],radius);
+    segment(shell,[x+.007,y,.099],[x-.045,y-.008,.058],radius);
+    segment(seam,[x-.045,y-.008,.058],[x-.049,y-.017,.02],radius*.9);
+  }
+  segment(shell,[.614,.16,.044],[.568,.232,-.019],.048);
+  segment(shell,[.568,.232,-.019],[.494,.247,-.002],.043);
   hand.add(glove);
   let elapsed=1,raised=0; const tip=new THREE.Vector3();
   return {

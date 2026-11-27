@@ -101,7 +101,7 @@ Controles novos: Tab troca a pagina da hotbar; 1 a 9 escolhem o item da pagina a
 **Multiplayer**: menu Multiplayer (ou Pausa > Multiplayer).
 - Criar sala: gera um codigo de 6 caracteres. Passe aos amigos.
 - Entrar: digite o codigo.
-- Ate 4 jogadores. Cada um joga na propria fazenda; as fazendas dos outros aparecem em terrenos ao redor da cidade (leste, sul e sudeste), com plantas, arvores e construcoes sincronizadas. Voce ve os outros jogadores andando pela cidade, com o nick acima da cabeca.
+- Até 6 jogadores. Cada um joga na propria fazenda; as fazendas dos outros aparecem em terrenos ao redor da cidade, com plantas, arvores e construcoes sincronizadas. Voce ve os outros jogadores andando pela cidade, com o nick acima da cabeca.
 - Na hospedagem estática, o jogo utiliza WebRTC e a sinalização pública do PeerJS. O servidor incluído usa salas próprias e funciona inclusive em uma LAN sem internet.
 - Teste local: abra duas abas com `index.html?net=local` (mesmo navegador) para simular a sala sem internet.
 

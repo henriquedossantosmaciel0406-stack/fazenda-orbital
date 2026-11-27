@@ -51,7 +51,7 @@ sockets.on('connection', socket => {
       const fail = msg => { post(socket, { error: msg }); socket.close(); };
       if (action === 'host' && current) return fail('Código em uso. Crie outra sala.');
       if (action === 'join' && !current) return fail('Sala não encontrada neste servidor.');
-      if (current && current.members.size >= 4) return fail('Sala cheia (4 jogadores).');
+      if (current && current.members.size >= 6) return fail('Sala cheia (6 jogadores).');
       room = current || { code, host: id, members: new Map() };
       rooms.set(code, room); room.members.set(id, socket);
       clearTimeout(deadline); post(socket, { ready: id });

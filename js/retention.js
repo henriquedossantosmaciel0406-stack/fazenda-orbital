@@ -166,7 +166,7 @@ const cropKeys = () => Object.keys(CONFIG.crops);
 const mutKeys = () => [...CONFIG.mutationOrder].reverse();
 const treeKeys = () => CONFIG.treeOrder.filter(k => CONFIG.trees[k]);
 const productKeys = () => Object.keys(CONFIG.products);
-const petKeys = () => Object.keys(PETS);
+const petKeys = () => Object.keys(PETS).filter(k=>!PETS[k].admin);
 
 export const ALBUM_TABS = [
   { id: 'crops', name: 'Plantas', keys: cropKeys, label: k => CONFIG.crops[k].name, thumb: k => k, hint: 'Colha cada planta para registrar.' },

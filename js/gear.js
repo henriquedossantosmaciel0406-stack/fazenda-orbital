@@ -1,3 +1,4 @@
+import {dragonActive} from './state.js';
 export const CANS=[
   {name:'Regador de lata',body:0x789DA0,trim:0xDBBE8D},
   {name:'Regador de cobre',body:0xBD734A,trim:0xFFCB78},
@@ -6,4 +7,4 @@ export const CANS=[
   {name:'Regador orbital',body:0x5279B6,trim:0xA1E7E3}
 ];
 export const canLevel = s => Math.max(1,Math.min(CANS.length,Math.round(s.maxWater/10)));
-export const canEfficiency = s => (1+(canLevel(s)-1)*0.25)*(s.activePet==='axolotl'?1.3:1);
+export const canEfficiency = s => (1+(canLevel(s)-1)*0.25)*(dragonActive()?2:s.activePet==='axolotl'?1.3:1);

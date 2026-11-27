@@ -57,7 +57,7 @@ export function rainField(scene) {
     }
   }
   cover(-120,120,-244,120);
-  for(const [dx,dz] of [[245,0],[0,345],[245,345]])cover(dx-110,dx,dz-245,dz+20);
+  for(const [dx,dz] of [[245,0],[0,345],[245,345],[-245,0],[-245,345]])cover(dx-110,dx,dz-245,dz+20);
   let nextCull=0;
   return {
     quality(q){geometry.setDrawRange(0,6*(q==='baixa'?62:q==='media'?106:DROPS));},

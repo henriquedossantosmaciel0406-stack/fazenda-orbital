@@ -770,7 +770,7 @@ function thumbnail(key){
   const img=el('img','item-model');img.alt='';img.draggable=false;img.src='assets/items/'+key+'.png';return img;
 }
 export function petRows(shop){
-  return Object.entries(PETS).filter(([key])=>shop||state.adoptedPets.includes(key)).map(([key,def])=>{
+  return Object.entries(PETS).filter(([key,def])=>(!def.admin||adminSession)&&(shop||state.adoptedPets.includes(key))).map(([key,def])=>{
     const owned=state.adoptedPets.includes(key),active=state.activePet===key;
     return {title:def.name,thumb:'pet-'+key,desc:def.desc,tag:active?'ACOMPANHANDO':owned?'ADOTADO':def.cost?def.cost+' CR':'GRÁTIS',
       buttons:[{label:active?'Descansar':owned?'Chamar':'Adotar',disabled:!owned&&state.money<def.cost,onClick:()=>{

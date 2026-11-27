@@ -20,7 +20,9 @@ local function post(peer,from,data)
   local m=room.members[peer]
   m.count=m.count+1
   redis.call('XADD',inbox(peer),'MAXLEN',192,tostring(m.count)..'-0','from',from,'data',data)
-  redis.call('EXPIRE',inbox(peer),100)
+  if now >= (m.renewInbox or 0) then
+    redis.call('EXPIRE',inbox(peer),180);m.renewInbox=now+60000
+  end
 end
 if room and (now-room.members[room.host].seen>90000) then erase();room=nil end
 if op=='host' then
@@ -36,9 +38,9 @@ end
 local total=0
 for peer in pairs(members) do total=total+1 end
 if op=='host' or op=='join' then
-  if total>=4 then return {409,'Sala cheia (4 jogadores).'} end
+  if total>=6 then return {409,'Sala cheia (6 jogadores).'} end
   for _,m in pairs(members) do if m.nick==nick then return {409,'Esta conta já está na sala. Cada jogador precisa da própria conta.'} end end
-  members[id]={proof=proof,nick=nick,seen=now,batch=0,count=0}
+  members[id]={proof=proof,nick=nick,seen=now,batch=0,count=0,compact=ARGV[11]=='1'}
   persist();return {200,'ok',total+1}
 end
 local me=members[id]
@@ -58,8 +60,14 @@ if seq~=me.batch and seq~=me.batch+1 then return {409,'Sequência da sala desatu
 if seq==me.batch+1 then
   local packets=cjson.decode(ARGV[8])
   for _,p in ipairs(packets) do
-    if p.pose and id~=room.host then
-      for target in pairs(members) do if target~=id then post(target,id,p.wire) end end
+    if p.pose then
+      if p.dragon and me.nick~='rick' then
+        local msg=cjson.decode(p.wire);msg.pet=cjson.null;p.wire=cjson.encode(msg)
+      end
+      me.pose=p.wire;me.poseSeq=seq
+      for target,m in pairs(members) do
+        if target~=id and not m.compact then post(target,id==room.host and '' or id,p.wire) end
+      end
     elseif id~=room.host then post(room.host,id,p.wire)
     elseif p.to then if members[p.to] and p.to~=id then post(p.to,'',p.wire) end
     else for target in pairs(members) do if target~=id and target~=p.except then post(target,'',p.wire) end end end
@@ -67,8 +75,18 @@ if seq==me.batch+1 then
   me.batch=seq
 end
 me.seen=now;persist()
-local rows=redis.call('XRANGE',inbox(id),tostring(after+1)..'-0','+','COUNT',64)
-return {200,'ok',total,rows}
+local rows={}
+if after<me.count then rows=redis.call('XRANGE',inbox(id),tostring(after+1)..'-0','+','COUNT',64) end
+local poses={}
+if me.compact then
+  local known=cjson.decode(ARGV[12])
+  for peer,m in pairs(members) do
+    if peer~=id and m.pose and m.poseSeq~=known[peer] then
+      table.insert(poses,{peer,m.poseSeq,peer==room.host and '' or peer,m.pose})
+    end
+  end
+end
+return {200,'ok',total,rows,poses}
 `;
 const identity=/^[0-9a-f-]{36}$/;
 module.exports=async function handle(req,res){
@@ -101,16 +119,19 @@ module.exports=async function handle(req,res){
           const wire=JSON.stringify(p.msg);
           if(Buffer.byteLength(wire)>65536)throw fail(413,'Mensagem grande demais.');
           const pose=p.msg.t==='pos'&&p.msg.id===id&&!p.msg.to&&!p.to&&!p.except&&[p.msg.x,p.msg.z,p.msg.r].every(Number.isFinite);
-          return {wire,pose,...(p.to?{to:p.to}:{}),...(p.except?{except:p.except}:{})};
+          if(pose&&Buffer.byteLength(wire)>1024)throw fail(413,'Posição grande demais.');
+          return {wire,pose,dragon:pose&&p.msg.pet==='dragon',...(p.to?{to:p.to}:{}),...(p.except?{except:p.except}:{})};
         });
       }
     }
-    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets),JSON.stringify(action),op==='admin'&&d.player||'');
-    const [status,message,size,rows]=result;
+    const known=Object.fromEntries(Object.entries(d.known||{}).filter(([peer,v])=>identity.test(peer)&&Number.isSafeInteger(v)).slice(0,6));
+    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets),JSON.stringify(action),op==='admin'&&d.player||'',d.compact?'1':'0',JSON.stringify(known));
+    const [status,message,size,rows,positions]=result;
     if(status!==200)throw fail(status,message);
     if(admission)return send(200,{ok:true,id,token,size});
     if(op==='admin')return send(200,{ok:true});
     const events=(rows||[]).map(([cursor,fields])=>({cursor:Number(cursor.split('-')[0]),from:fields[1]||null,...(fields[3]==='@gone'?{gone:true}:fields[3].startsWith('@admin:')?{admin:JSON.parse(fields[3].slice(7))}:{msg:JSON.parse(fields[3])})}));
-    send(200,{ok:true,size,events});
+    const poses=(positions||[]).map(([id,version,from,wire])=>({id,version,from:from||null,msg:JSON.parse(wire)}));
+    send(200,{ok:true,size,events,poses});
   }catch(e){send(e.status||503,{ok:false,error:e.status?e.message:'Servidor de salas temporariamente indisponível.'});}
 };

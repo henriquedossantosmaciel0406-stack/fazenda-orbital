@@ -41,6 +41,7 @@ const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 70
 setSaveKey(saveKeyFor(session.nick));
 const hasSave = load(); // o save e lido ANTES de criar o jogo, para restaurar canteiros sem duplicar
 if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS));
+else if(state.activePet==='dragon')state.activePet=null;
 const world = createWorld(scene);
 
 // Congela as matrizes do cenario fixo: o Three.js deixa de recalcula-las a cada quadro.
