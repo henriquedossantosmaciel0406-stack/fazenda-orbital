@@ -464,3 +464,17 @@ button:focus-visible,input:focus-visible{outline:3px solid #ffca67;outline-offse
 .daily-day.big{background:rgba(255,209,102,.12)}
 .daily-day i{font-style:normal;font-size:11px;font-weight:700;color:#7ed957}
 @media (max-width:560px){.daily-track{grid-template-columns:repeat(4,1fr)}}
+
+#login {
+  background: linear-gradient(90deg,#101a31cc,#17233988),url('assets/scenes/orbital-dawn.png') center / cover;
+}
+#login .menu-card.auth {background:#233448;border-color:#152436;border-top-color:#8fa995}
+#login .colony-view,.colony-view {
+  background-image:url('assets/scenes/orbital-dawn.png');background-position:50% 52%;
+  background-size:cover;image-rendering:pixelated;
+}
+#login .colony-view {height:clamp(114px,25vh,192px)}
+#login .colony-view h1 {color:#ffdda1;text-shadow:2px 2px #623c46;border-left:3px solid #ffc77a}
+#login .auth-tabs button.active {color:#162f36;background:#a3dabc}
+#login input:focus-visible {outline:2px solid #90dfc4;outline-offset:2px}
+@media(max-height:520px){#login .colony-view{height:58px;min-height:0}#login .menu-card.auth{max-height:96dvh;overflow:auto}}

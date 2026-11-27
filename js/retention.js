@@ -1,3 +1,4 @@
+import {setSprite} from './pixel-sprites.js';
 // Retencao: recompensa diaria com sequencia e album de colecao.
 // Tudo salvo em state.daily e state.album (campos novos, compativeis com saves antigos).
 import { state, bus, save } from './state.js';
@@ -111,7 +112,7 @@ export function openDaily() {
         const done = n <= shown;
         const cell = el('div', 'daily-day' + (done ? ' done' : '') + (n === st.next && st.kind !== 'claimed' ? ' next' : '') + (r.big ? ' big' : ''));
         const sprite=el('img','daily-sprite');
-        sprite.src=r.crystals?'assets/items/crystal.png':r.seeds?'assets/items/lettuce.png':'assets/skills/cash.png';
+        setSprite(sprite,r.crystals?'assets/items/crystal.png':r.seeds?'assets/items/lettuce.png':'assets/skills/cash.png');
         sprite.alt='';
         cell.append(el('b', null, 'Dia ' + n),sprite, el('strong',null,r.money+' CR'));
         if (r.crystals) cell.append(el('span', 'extra', r.crystals + (r.crystals > 1 ? ' cristais' : ' cristal')));

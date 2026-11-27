@@ -1,3 +1,5 @@
+import {planetAt} from './planets.js';
+import {planetGarden,merchantWagon} from './colony-models.js';
 import {meadowPaint,seaPaint,planetPaint} from './landscape-paint.js';
 import {cloudField} from './weather.js';
 import { buildTown } from './town.js';
@@ -409,7 +411,8 @@ export function animateStructure(group, t, dt) {
 // ---------- Mundo ----------
 function seeded(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
 
-export function createWorld(scene) {
+export function createWorld(scene,rank=0) {
+  const destination=planetAt(rank);
   scene.background = new THREE.Color(0x7CD0FF);
   scene.fog = new THREE.Fog(0x9BDCFF, 80, 340);
 
@@ -468,8 +471,13 @@ export function createWorld(scene) {
   for (let i = 0; i < 40; i++) { dm.setPosition(0, 0.1, -114 + i * 5.8); dashes.setMatrixAt(i, dm); }
   scene.add(dashes);
 
+  world.wagon=merchantWagon();scene.add(world.wagon);
+  if(rank){
+    const field=M(geo('box',89,.06,113),mat(destination.land));
+    field.position.set(-55,.009,-43); field.receiveShadow=true;scene.add(field,planetGarden(rank));
+  }
   // --- Solo da fazenda e area de plantio ---
-  const soil = M(geo('box', 40, 0.2, 44), mat(0x8B5E3C, { roughness: 1, flatShading: false }));
+  const soil = M(geo('box', 40, 0.2, 44), mat(destination.soil, { roughness: 1, flatShading: false }));
   soil.position.set(-32, 0.1, -24.5); soil.receiveShadow = true; scene.add(soil);
   const plaza = M(geo('box', 48, 0.16, 42), mat(0xABC085, { roughness: 0.9, flatShading: false }));
   plaza.position.set(30, 0.08, 25); plaza.receiveShadow = true; scene.add(plaza);
@@ -617,7 +625,7 @@ export function createWorld(scene) {
     if (world.onIsland(x, z)) return 'ILHA CRISTALINA';
     if (z < -117) return 'PONTE ESTELAR';
     if (x > 8 && z > 2) return 'CIDADE';
-    if (x < -8) return 'FAZENDA';
+    if (x < -8) return rank?destination.name:'FAZENDA';
     return 'ESTRADA';
   };
   world.inBuildArea = (x, z, r) => {

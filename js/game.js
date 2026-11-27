@@ -720,7 +720,7 @@ function openFactory() {
 
 function buySeed(k, n) {
   const c = CONFIG.crops[k], cost = c.seedCost * n;
-  if (!cropUnlocked(c) || state.money < cost) { play('error'); return; }
+  if ((c.planet && Date.now()>=state.merchantUntil) || !cropUnlocked(c) || state.money < cost) { play('error'); return; }
   state.money -= cost; state.seeds[k] += n;
   play('buy'); showToast('Comprou ' + n + ' semente(s) de ' + c.name, 'good'); save();
 }
@@ -735,7 +735,7 @@ function equipLevel(key) { return key === 'speed' ? state.speedLevel : key === '
 function equipCost(key) { const u = CONFIG.upgrades[key]; return Math.round(u.baseCost * Math.pow(u.growth, equipLevel(key) - 1)); }
 function buyEquip(key) {
   const u = CONFIG.upgrades[key], cost = equipCost(key);
-  if (state.money < cost || equipLevel(key) >= u.max) { play('error'); return; }
+  if ((key==='water' && state.prestige.rank<(CANS[canLevel(state)]?.rank||0)) || state.money < cost || equipLevel(key) >= u.max) { play('error'); return; }
   state.money -= cost;
   if (key === 'speed') state.speedLevel++; else if (key === 'water') { state.maxWater += 10; state.water = Math.min(state.maxWater, state.water + 10); } else state.yieldLevel++;
   addXp(12); play('upgrade'); showToast(key==='water' ? CANS[canLevel(state)-1].name+' equipado' : u.name+' melhorado(a)', 'good'); save();
@@ -758,7 +758,7 @@ function structureRow(type) {
 
 function openGeneralStore() {
   openShop('Loja Geral', () => {
-    const seeds = CONFIG.cropOrder.map(k => {
+    const seeds = CONFIG.cropOrder.filter(k=>!CONFIG.crops[k].planet).map(k => {
       const c = CONFIG.crops[k], locked = !cropUnlocked(c);
       return {
         thumb:k, color: c.color, title: 'Semente de ' + c.name,
@@ -811,12 +811,20 @@ function openGeneralStore() {
         buttons: maxed ? [] : [{ label: 'Melhorar - ' + cost + ' CR', disabled: state.money < cost, onClick: () => buyEquip(k) }]
       };
     });
+    for(const [key,tool] of Object.entries(CONFIG.tools)){
+      const level=state.tools[key],cost=tool.cost*(level+1),locked=state.prestige.rank<tool.rank;
+      equip.push({thumb:key,title:tool.name,desc:tool.desc,tag:locked?'PRESTÍGIO '+tool.rank:'Nível '+level+' / '+tool.max,
+        buttons:level===tool.max?[]:[{label:'Instalar · '+cost+' CR',disabled:locked||state.money<cost,onClick:()=>{
+          if(locked||state.tools[key]!==level||state.money<cost)return;
+          state.money-=cost;state.tools[key]++;play('upgrade');save();
+        }}]});
+    }
     const cl=canLevel(state),canCost=equipCost('water');
     const cans=CANS.map((can,i)=>{
-      const next=i===cl,owned=i<cl;
+      const next=i===cl,owned=i<cl,locked=state.prestige.rank<(can.rank||0);
       return {thumb:'can-'+(i+1),title:can.name,desc:((i+1)*10)+' de capacidade · '+(100+i*25)+'% de rega por unidade de água',
-        tag:i===cl-1?'EQUIPADO':owned?'ADQUIRIDO':next?'DISPONÍVEL':'REQUER '+CANS[i-1].name.toUpperCase(),
-        buttons:next?[{label:'Comprar · '+canCost+' CR',disabled:state.money<canCost,onClick:()=>buyEquip('water')}]:[]};
+        tag:i===cl-1?'EQUIPADO':owned?'ADQUIRIDO':locked?'PRESTÍGIO '+can.rank:next?'DISPONÍVEL':'REQUER '+CANS[i-1].name.toUpperCase(),
+        buttons:next?[{label:'Comprar · '+canCost+' CR',disabled:locked||state.money<canCost,onClick:()=>buyEquip('water')}]:[]};
     });
     const droneWhy = state.level < CONFIG.drone.level ? 'Nivel ' + CONFIG.drone.level : state.drones.length >= 4 ? 'Limite atingido' : null;
     const drones = [
@@ -944,7 +952,7 @@ function addPickupMesh(p) {
 function collectPickup(p) {
   state.pickups = state.pickups.filter(x => x !== p);
   const m = pickupMeshes.get(p.id); if (m) { scene.remove(m); pickupMeshes.delete(p.id); }
-  const pool = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level >= 3 && CONFIG.crops[k].level <= state.level + 2 && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
+  const pool = CONFIG.cropOrder.filter(k => !CONFIG.crops[k].planet && CONFIG.crops[k].level >= 3 && CONFIG.crops[k].level <= state.level + 2 && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
   const k = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'lettuce';
   const n = 2 + Math.floor(Math.random() * 3);
   state.seeds[k] += n; state.crystals += 1; state.rp += 3; addXp(60);
@@ -1030,7 +1038,8 @@ function findTarget() {
   }
   if (target.type) return;
   const c = camera.position;
-  if (flat(c, world.shopPosition.x, world.shopPosition.z) < 5.5) target.type = 'shop';
+  if(world.wagon.visible && flat(c,world.wagon.position.x,world.wagon.position.z)<5)target.type='merchant';
+  else if (flat(c, world.shopPosition.x, world.shopPosition.z) < 5.5) target.type = 'shop';
   else if (flat(c, world.marketPosition.x, world.marketPosition.z) < 5.5) target.type = 'market';
   else if (flat(c, world.pumpPosition.x, world.pumpPosition.z) < 3.4) target.type = 'pump';
   else if (flat(c, world.stationPosition.x, world.stationPosition.z) < 5) target.type = 'station';
@@ -1058,6 +1067,7 @@ function promptFor() {
     case 'structure': return 'E - ' + target.ref.def.name + (target.ref.def.kind === 'building' ? ' (nivel ' + target.ref.data.level + ')' : '');
     case 'pickup': return 'E - Coletar meteorito de sementes';
     case 'crystal': return 'E - Coletar cristal';
+    case 'merchant': return 'E - Negociar com o mercador viajante';
     case 'shop': return 'E - Abrir Loja Geral';
     case 'market': return 'E - Abrir Mercado';
     case 'pump': return 'E - Encher regador';
@@ -1084,6 +1094,13 @@ function interact() {
     case 'structure': openStructurePanel(r); break;
     case 'pickup': collectPickup(r); break;
     case 'crystal': mineCrystal(r); break;
+    case 'merchant':
+      if(Date.now()<state.merchantUntil)openShop('Carroça interplanetária',()=>[{name:'Sementes visitantes',items:CONFIG.cropOrder.filter(k=>CONFIG.crops[k].planet).map(k=>{
+        const c=CONFIG.crops[k],locked=!cropUnlocked(c);
+        return {thumb:k,title:c.name,desc:'Origem: '+c.planet+' · Colheita em '+c.growTime+' s · Venda por '+c.sellPrice+' CR',
+          tag:locked?'Nível '+c.level+' · Prestígio '+(c.prestige||0):'Disponível',
+          buttons:[{label:'Comprar · '+c.seedCost+' CR',disabled:locked||Date.now()>=state.merchantUntil||state.money<c.seedCost,onClick:()=>buySeed(k,1)}]};
+      })}]);break;
     case 'shop': openGeneralStore(); break;
     case 'market': openMarket(); break;
     case 'pump': useWaterPump(); break;
@@ -1257,7 +1274,7 @@ export function updateGame(dt) {
 
   state.stats.play += dt;
   const day = updateDayNight(dt);
-  updateEvents(dt); updateContracts(dt); updateResearch(dt);
+  updateEvents(dt); world.wagon.visible=Date.now()<state.merchantUntil; updateContracts(dt); updateResearch(dt);
   updateResources(dt, day);
   updatePlots(dt, clock);
   updateTrees(dt, clock);

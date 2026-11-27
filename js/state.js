@@ -39,6 +39,7 @@ export const state = {
   products: emptyProducts(),
   crystals: 0,
   saplings: emptyTrees(), fruits: emptyTrees(), mutated: {},
+  tools:{satchel:0,cell:0,lens:0}, merchantUntil:0,
   adoptedPets: [], activePet: null,
   prestige: { rank: 0, stars: 0, total: 0, runStart: 0, upgrades: {} },
   daily: { streak: 0, last: '', best: 0, total: 0 },
@@ -78,7 +79,8 @@ export function enableOrbitalPass(pets) {
   state.rp=Math.max(9999,state.rp);
   state.speedLevel=CONFIG.upgrades.speed.max;
   state.yieldLevel=CONFIG.upgrades.yield.max;
-  state.maxWater = Math.max(50,state.maxWater);
+  for(const [key,tool] of Object.entries(CONFIG.tools))state.tools[key]=tool.max;
+  state.maxWater = Math.max(CONFIG.upgrades.water.max*10,state.maxWater);
   state.water = state.maxWater;
   state.crystals = Math.max(9999,state.crystals);
   for (const id of Object.keys(CONFIG.research)) state.research[id] = true;
@@ -105,8 +107,8 @@ export function reputation() {
 export const perk = id => (state.prestige && state.prestige.upgrades[id]) || 0;
 export const cropUnlocked = c => state.level >= c.level && state.prestige.rank >= (c.prestige || 0);
 export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market') + 0.04 * perk('cash'));
-export const stockLimit = () => (dragonActive()?200:0) + CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
-export const maxEnergy = () => CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
+export const stockLimit = () => (dragonActive()?200:0) + 30*state.tools.satchel + 25*state.prestige.rank + CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
+export const maxEnergy = () => 20*state.tools.cell + CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
 export function stockUsed() {
   let n = 0;
   for (const k in state.crops) n += state.crops[k];
@@ -116,7 +118,7 @@ export function stockUsed() {
   return n;
 }
 export const treeLimit = () => CONFIG.baseTreeLimit + 4 * state.land.orchard;
-export const soilGrowth = () => (1 + 0.08 * state.land.soil)*(dragonActive()?2:state.activePet==='turtle'?1.2:1);
+export const soilGrowth = () => (1 + 0.10 * state.prestige.rank)*(1 + 0.08 * state.land.soil)*(dragonActive()?2:state.activePet==='turtle'?1.2:1);
 export const soilDouble = () => 0.05 * state.land.soil;
 export const mutKey = (m, c) => m + ':' + c;
 export const stockFree = () => Math.max(0, stockLimit() - stockUsed());
@@ -139,7 +141,7 @@ export function addMoney(n) {
 }
 export function addXp(amount) {
   if (special) return;
-  state.xp += Math.round(amount * (1 + 0.1 * perk('xp')));
+  state.xp += Math.round(amount * (1 + 0.1 * perk('xp') + 0.1*state.tools.lens + .15*state.prestige.rank));
   while (state.xp >= state.xpNeeded) {
     state.xp -= state.xpNeeded;
     state.level++;
@@ -163,7 +165,7 @@ export function setObjective(index) {
 // ---------- Salvamento ----------
 export function save() {
   const data = {
-    version: CONFIG.version, adoptedPets: state.adoptedPets, activePet: state.activePet,
+    version: CONFIG.version, tools:state.tools, merchantUntil:state.merchantUntil, adoptedPets: state.adoptedPets, activePet: state.activePet,
     money: state.money, water: state.water, maxWater: state.maxWater, energy: state.energy,
     speedLevel: state.speedLevel, yieldLevel: state.yieldLevel,
     seeds: state.seeds, crops: state.crops, products: state.products, crystals: state.crystals,
@@ -198,7 +200,7 @@ export function load() {
     if (old && old.type === 'none') data.objectiveIndex = 1; // missao inicial ja concluida
     else if (old && old.type === 'plant') { data.objectiveIndex = 0; data.objectiveProgress = old.progress || 0; }
   }
-  const keep = ['seeds', 'crops', 'products', 'research', 'contracts', 'stats', 'achievements', 'settings', 'saplings', 'fruits', 'mutated', 'land', 'daily', 'album', 'prestige'];
+  const keep = ['tools','seeds', 'crops', 'products', 'research', 'contracts', 'stats', 'achievements', 'settings', 'saplings', 'fruits', 'mutated', 'land', 'daily', 'album', 'prestige'];
   for (const key of Object.keys(data)) {
     if (['expedition', 'plots', 'lettuceSeed', 'strawberrySeed', 'lettuce', 'strawberry', 'objective', 'version', 'objectiveProgress'].includes(key)) continue;
     if (keep.includes(key) && data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
@@ -208,6 +210,11 @@ export function load() {
     }
   }
   setObjective(data.objectiveIndex || 0);
+  if((data.version||0)<5 && Number.isSafeInteger(data.prestige?.rank) && data.prestige.rank>0){
+    const rank=data.prestige.rank,credit=4*rank+rank*(rank-1);
+    state.prestige.stars=(data.prestige.stars||0)+credit;
+    state.prestige.total=(data.prestige.total||0)+credit;
+  }
   if (data.objective && data.objective.type === CONFIG.objectives[state.objectiveIndex].type) state.objective.progress = data.objective.progress || 0;
   if (data.objectiveProgress) state.objective.progress = data.objectiveProgress;
   state.savedPlots = data.plots || [];

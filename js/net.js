@@ -1,5 +1,8 @@
+import {visiting} from './cloud.js';
 import {makeFarmer,animateFarmer,companion,PETS} from './actors.js';
 import {canModel} from './watering-can.js';
+import {planetAt} from './planets.js';
+import {planetGarden} from './colony-models.js';
 import {canLevel,CANS} from './gear.js';
 import {varySpecimen} from './botany.js';
 import { waterJet } from './water.js';
@@ -163,11 +166,18 @@ function makeFarmView(nick, off) {
   const plotsG = new THREE.Group(), treesG = new THREE.Group(), structG = new THREE.Group();
   root.add(plotsG, treesG, structG);
   scene.add(root);
-  return { root, island, label, plotsG, treesG, structG, plots: new Map(), structs: new Map(), treeSig: '' };
+  return { root, land, soil, rank:0, island, label, plotsG, treesG, structG, plots: new Map(), structs: new Map(), treeSig: '' };
 }
 
 function applySnapshot(r, s) {
   const f = r.farm;
+  const rank=Number.isSafeInteger(s.rank)&&s.rank>0?s.rank:0;
+  if(f.rank!==rank){
+    const planet=planetAt(rank);
+    f.land.material=mat(planet.land);f.soil.material=mat(planet.soil);
+    if(f.garden){f.root.remove(f.garden);disposeTree(f.garden);}
+    f.garden=planetGarden(rank);f.root.add(f.garden);f.rank=rank;
+  }
   r.lvl = s.lvl; f.island.visible = !!s.island;
   // canteiros
   const seen = new Set();
@@ -258,7 +268,7 @@ function makeSnapshot() {
   }
   const t = state.trees.map(x => [x.type, x.x, x.z, +Math.min(1, x.progress / CONFIG.trees[x.type].growTime).toFixed(2), x.fruits]);
   const s = state.structures.map(x => [x.type, x.x, x.z, x.level]);
-  return { lvl: state.level, island:state.islandUnlocked, p, t, s };
+  return { lvl: state.level, rank:state.prestige.rank, island:state.islandUnlocked, p, t, s };
 }
 
 function send(m) { // envia a mensagem para os outros (o host repassa)
@@ -426,6 +436,7 @@ function refundPending(id) {
 // Host manda o relogio e o clima; convidados seguem o host (dia/noite e eventos iguais para todos)
 function applySync(m) {
   state.time = m.time;
+  if(Number.isFinite(m.merchantLeft))state.merchantUntil=Date.now()+Math.min(180000,Math.max(0,m.merchantLeft));
   state.nextEventIn = Math.max(state.nextEventIn, 90); // convidado nao sorteia eventos proprios
   const cur = state.event ? state.event.id : null, next = m.ev ? m.ev.id : null;
   if (cur !== next) {
@@ -436,7 +447,7 @@ function applySync(m) {
   state.boom = m.boom ? { crop: m.boom.crop, mult: m.boom.mult, left: m.boom.left } : null;
 }
 function sendSync() {
-  send({ t: 'sync', id: N.myId, time: +state.time.toFixed(3), ev: state.event ? { id: state.event.id, left: +state.event.left.toFixed(1) } : null, boom: state.boom ? { crop: state.boom.crop, mult: state.boom.mult, left: +state.boom.left.toFixed(1) } : null });
+  send({ t: 'sync', id: N.myId, merchantLeft:Math.max(0,state.merchantUntil-Date.now()), time: +state.time.toFixed(3), ev: state.event ? { id: state.event.id, left: +state.event.left.toFixed(1) } : null, boom: state.boom ? { crop: state.boom.crop, mult: state.boom.mult, left: +state.boom.left.toFixed(1) } : null });
 }
 
 // Teleporta para a fazenda ou para perto do amigo
@@ -493,10 +504,10 @@ function setupTransportHandlers() {
 export async function hostRoom() {
   if (N.mode !== 'solo') return { ok: false, error: 'Voce ja esta em uma sala' };
   try {
-    const code = newCode();
+    const code = visiting?'0'+newCode().slice(1):newCode();
     N.mode = 'joining';
     const handlers = setupTransportHandlers();
-    N.tr = relayAddress() && !LOCAL ? await connectRelay('host', code, handlers) : await (LOCAL ? hostLocal : hostPeer)(code, handlers);
+    N.tr = visiting ? await hostPeer(code,handlers) : relayAddress() && !LOCAL ? await connectRelay('host', code, handlers) : await (LOCAL ? hostLocal : hostPeer)(code, handlers);
     N.lastFarm = null; N.mode = 'host'; N.code = code; N.myId = N.tr.id;
     refreshChip();
     return { ok: true, code };
@@ -510,7 +521,8 @@ export async function joinRoom(code) {
   try {
     N.mode = 'joining';
     const handlers = setupTransportHandlers();
-    N.tr = relayAddress() && !LOCAL ? await connectRelay('join', code, handlers) : await (LOCAL ? joinLocal : joinPeer)(code, handlers);
+    if(visiting!==code.startsWith('0'))throw new Error('Contas e visitantes jogam em salas separadas. Confira o código.');
+    N.tr = visiting ? await joinPeer(code,handlers) : relayAddress() && !LOCAL ? await connectRelay('join', code, handlers) : await (LOCAL ? joinLocal : joinPeer)(code, handlers);
     N.lastFarm = null; N.hostId = null; N.mode = 'guest'; N.code = code; N.myId = N.tr.id;
     let timer;
     try {

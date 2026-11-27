@@ -1,7 +1,7 @@
 // Configuracao e balanceamento do Fazenda Orbital (dados puros, sem logica de jogo)
 const CONFIG_IRR = ['sprinkler', 'drip', 'rotary', 'cloud'];
 export const CONFIG = {
-  version: 4,
+  version: 5,
   player: { height: 1.7, speed: 5.4, runMultiplier: 1.65 },
   start: { money: 120, water: 10, maxWater: 10, energy: 20, speedLevel: 1, yieldLevel: 1 },
   hotbarPageSize: 9,
@@ -13,8 +13,11 @@ export const CONFIG = {
   crystalPrice: 70,
   farmArea: { x0: -100, x1: -10, z0: -100, z1: 14 },
 
-  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus', 'radish', 'okra', 'pineapple', 'prism', 'sunflower', 'voidberry'],
+  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus', 'radish', 'okra', 'pineapple', 'prism', 'sunflower', 'voidberry', 'miralume','heliobell','nixpearl'],
   crops: {
+    miralume: {name:'Lanterna de Mira',short:'MIR',planet:'Mira',seedCost:45,sellPrice:155,growTime:70,waterUse:2,color:0x67eed3,level:1,xp:30,rp:2},
+    heliobell: {name:'Sino de Hélio',short:'HEL',planet:'Hélio',prestige:1,seedCost:180,sellPrice:620,growTime:150,waterUse:3,color:0xff9868,level:2,xp:90,rp:5},
+    nixpearl: {name:'Pérola de Nix',short:'NIX',planet:'Nix',prestige:3,seedCost:620,sellPrice:2200,growTime:265,waterUse:5,color:0xd7a5ff,level:4,xp:210,rp:9},
     radish:     { name: 'Rabanete rubi', short: 'RUB', seedCost: 6, sellPrice: 17, growTime: 20, waterUse: 1, color: 0xE44E7F, level: 1, xp: 8, rp: 1 },
     okra:       { name: 'Quiabo de órbita', short: 'QUI', seedCost: 42, sellPrice: 136, growTime: 76, waterUse: 2, color: 0x8BDF89, level: 4, xp: 30, rp: 2 },
     pineapple:  { name: 'Abacaxi eclipse', short: 'ABA', seedCost: 180, sellPrice: 650, growTime: 184, waterUse: 5, color: 0xF8AA39, level: 7, xp: 112, rp: 6 },
@@ -81,9 +84,14 @@ export const CONFIG = {
     sorbet:  { name: 'Sorvete lunar',     from: { melon: 2 },      sellPrice: 1150 }
   },
 
+  tools: {
+    satchel:{name:'Alforje de carga', rank:0, cost:160, max:4, desc:'+30 espaços de estoque por nível'},
+    cell:{name:'Célula de plasma', rank:1, cost:300, max:4, desc:'+20 de energia máxima por nível'},
+    lens:{name:'Lente de campo', rank:2, cost:450, max:3, desc:'+10% de XP base por nível'}
+  },
   upgrades: {
     speed: { name: 'Botas de velocidade', baseCost: 150, growth: 1.6, max: 5, desc: 'Aumenta sua velocidade de movimento.' },
-    water: { name: 'Tanque de agua',      baseCost: 120, growth: 1.5, max: 5, desc: 'Aumenta a capacidade do regador.' },
+    water: { name: 'Tanque de agua',      baseCost: 120, growth: 1.5, max: 8, desc: 'Aumenta a capacidade do regador.' },
     yield: { name: 'Luvas de colheita',   baseCost: 200, growth: 1.6, max: 5, desc: 'Aumenta a quantidade colhida.' }
   },
 
@@ -147,7 +155,7 @@ export const CONFIG = {
     urgent:  { name: 'Pedido urgente',    kind: 'instant', weight: 2, level: 2, duration: 0,  text: 'Pedido urgente no Mercado: entrega com bonus.' },
     rainbow: { name: 'Arco-iris',         kind: 'climate', weight: 2, level: 2, duration: 55, text: 'Arco-iris: as plantas crescem 25% mais rapido.' },
     festival:{ name: 'Festival da colheita', kind: 'climate', weight: 2, level: 3, duration: 60, text: 'Festival da colheita: todos os produtos valem 25% mais.' },
-    merchant:{ name: 'Mercador viajante', kind: 'instant', weight: 2, level: 2, duration: 0,  text: 'Um mercador viajante deixou sementes de presente na sua mochila!' },
+    merchant:{ name: 'Mercador viajante', kind: 'instant', weight: 2, level: 2, duration: 0,  text: 'A carroça chegou à praça entre as lojas! Sementes de outros planetas por 3 minutos.' },
     meteor:  { name: 'Meteorito de sementes', kind: 'instant', weight: 2, level: 2, duration: 0, text: 'Meteorito de sementes caiu na fazenda! Procure o brilho.' }
   },
 

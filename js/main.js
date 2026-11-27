@@ -1,3 +1,4 @@
+import {flush} from './cloud.js';
 // Ponto de entrada: renderer, cena, camera, loop principal e ligacao dos modulos.
 import * as THREE from 'three';
 import { createWorld } from './world.js';
@@ -38,11 +39,11 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 700);
 
 // Login/cadastro antes de tudo: cada conta tem o proprio save
-setSaveKey(saveKeyFor(session.nick));
+setSaveKey(session.visitor?'orbital-fazenda-visitante-v1':saveKeyFor(session.nick));
 const hasSave = load(); // o save e lido ANTES de criar o jogo, para restaurar canteiros sem duplicar
 if (session.orbitalPass) enableOrbitalPass(Object.keys(PETS));
 else if(state.activePet==='dragon')state.activePet=null;
-const world = createWorld(scene);
+const world = createWorld(scene,state.prestige.rank);
 
 // Congela as matrizes do cenario fixo: o Three.js deixa de recalcula-las a cada quadro.
 const dynamic = new Set([world.clouds, world.water, world.islandRocks, world.bridge, ...world.crystalNodes.map(n => n.mesh)]);
@@ -131,7 +132,7 @@ addEventListener('resize', () => {
   applyResolution();
 });
 addEventListener('beforeunload', () => { if (state.mode === 'play') save(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && state.mode === 'play') save(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state.mode === 'play') {save();void flush();} });
 
 // ---------- Loop ----------
 const clock = new THREE.Clock();

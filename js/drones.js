@@ -203,7 +203,7 @@ function updateOne(e, dt, t) {
     const dist = moveTo(e, pad.x, pad.y + 0.35, pad.z, dt, speed);
     flying = dist > 0.4;
     if (!flying) {
-      const amt = Math.min(D.chargeRate * dt, state.energy, capacity - d.energy);
+      const amt = Math.min(D.chargeRate * moduleValue(d,'charger') * dt, state.energy, capacity - d.energy);
       if (amt > 0) { d.energy += amt; state.energy -= amt; e.taskText = 'Carregando'; }
       else if (state.energy < 0.1 && d.energy < 1) { d.status = 'dead'; e.taskText = 'Sem energia'; }
       if (d.energy >= capacity * 0.95) { d.status = 'active'; e.returning = false; e.taskText = 'Aguardando'; }
@@ -212,7 +212,7 @@ function updateOne(e, dt, t) {
     // ATIVO
     flying = true;
     const drain = (D.drain * researchDroneDrain());
-    d.energy -= (e.task || e.returning ? drain : D.idleDrain) * dt;
+    d.energy -= (e.task || e.returning ? drain : D.idleDrain) * moduleValue(d,'regulator') * dt;
     if (d.energy <= 0) { die(e); return; }
     if (!e.task && !e.returning) {
       if (d.energy < capacity * 0.22) { e.returning = true; e.taskText = 'Voltando a base'; }

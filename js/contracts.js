@@ -96,7 +96,7 @@ function spawnContract() {
 
 // Pedido urgente (evento): entrega com bonus
 export function createUrgent() {
-  const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
+  const eligible = CONFIG.cropOrder.filter(k => !CONFIG.crops[k].planet && CONFIG.crops[k].level <= state.level && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
   const key = eligible[Math.floor(Math.random() * eligible.length)];
   const crop = CONFIG.crops[key];
   const amount = Math.min(8, 3 + Math.floor(state.level / 2));

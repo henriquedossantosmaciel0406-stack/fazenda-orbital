@@ -40,7 +40,7 @@ function allowedSave(data,nick){
   return data;
 }
 const validSave=s=>s&&typeof s==='object'&&Array.isArray(s.plots)&&Number.isFinite(s.level);
-const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',save:a.save,revision:a.revision});
+const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',save:a.save,revision:a.revision,lastSaveId:a.lastSaveId||null});
 function adminAction(a,data,roomOnly=false){
   if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
   const commands=['clear','dawn','noon','sunset','night'];
@@ -85,9 +85,11 @@ module.exports=async function api(req,res,route,attempt=0){
     if(route==='admin')return send(200,{ok:true,...adminAction(a,data)});
     if(route==='save'){
       if(data.nick!==a.nick)throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
+      const opId=typeof data.opId==='string'&&/^[0-9a-f-]{36}$/.test(data.opId)?data.opId:null;
+      if(opId && a.lastSaveId===opId && a.revision===data.revision+1)return send(200,{ok:true,revision:a.revision});
       if(data.revision!==a.revision)throw fail(409,'Há progresso mais recente em outro navegador. Reabra o jogo para carregá-lo.');
       if(data.save!==null&&!validSave(data.save))throw fail(400,'Progresso inválido.');
-      a.save=allowedSave(data.save,a.nick);a.revision++;await write(a);return send(200,{ok:true,revision:a.revision});
+      a.save=allowedSave(data.save,a.nick);a.lastSaveId=opId;a.revision++;await write(a);return send(200,{ok:true,revision:a.revision});
     }
     if(route==='logout'){a.sessions=a.sessions.filter(s=>s.hash!==key);await write(a);cookie(req,res,'',0);return send(200,{ok:true});}
     throw fail(404,'Rota desconhecida.');

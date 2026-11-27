@@ -17,12 +17,12 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).end(index);
     return;
   }
-  if (!/^\/(style\.css|assets\/items\/[\w-]+\.png|assets\/fonts\/baloo-2-latin\.woff2|js\/[\w./-]+\.js)$/.test(file) || file.includes('..')) {
+  if (!/^\/(style\.css|assets\/(?:items|scenes|skills)\/[\w-]+\.png|assets\/interface\.css|assets\/fonts\/[\w-]+\.woff2?|js\/[\w./-]+\.js)$/.test(file) || file.includes('..')) {
     res.writeHead(404).end(); return;
   }
   const stream = fs.createReadStream(path.join(__dirname, file));
   stream.on('open', () => {
-    res.setHeader('Content-Type', file.endsWith('.png') ? 'image/png' : file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.css') ? 'text/css' : 'text/javascript; charset=utf-8');
+    res.setHeader('Content-Type', file.endsWith('.png') ? 'image/png' : file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.woff') ? 'font/woff' : file.endsWith('.css') ? 'text/css' : 'text/javascript; charset=utf-8');
     stream.pipe(res);
   });
   stream.on('error', () => res.writeHead(404).end());

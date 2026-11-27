@@ -24,6 +24,14 @@ export function canModel(level){
   }
   if(level>=3){const badge=piece(geo(level===5?'oct':'sph',0.083,...(level===5?[0]:[8,5])),palette.trim,0,0.05,0.294);badge.scale.z=0.4;}
   if(level>=4){const arch=piece(geo('tor',0.237,0.032,6,14,Math.PI),palette.trim,0,0.218,0);arch.rotation.y=0.2;}
+  if(level>=6){
+    for(const side of [-1,1]){
+      const pod=piece(geo('cyl',.054,.069,.23,8),palette.trim,side*.24,.06,.19);
+      pod.rotation.z=-side*.21;
+    }
+    if(level===7)for(let i=0;i<3;i++)piece(geo('cone',.062,.15,5),palette.trim,(i-1)*.122,.26,-.135);
+    if(level===8){const orbit=piece(geo('tor',.38,.021,6,20),palette.trim,0,.02,0);orbit.rotation.set(1.1,0,-.35);}
+  }
   can.userData.tip=head;return can;
 }
 export function createWateringCan(camera) {

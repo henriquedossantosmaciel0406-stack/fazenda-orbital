@@ -39,6 +39,7 @@ function pickEvent() {
     const d = CONFIG.events[id];
     if (d.level > state.level) return false;
     if (d.kind === 'climate' && climateBusy) return false;
+    if (id==='merchant' && Date.now()<state.merchantUntil)return false;
     if (id === 'boom' && state.boom) return false;
     return true;
   });
@@ -81,8 +82,7 @@ export function triggerEvent(id) {
     showToast(def.text, 'event'); play('alert');
     bus.emit('urgentOrder', c);
   } else if (id === 'merchant') {
-    const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
-    for (let i = 0; i < 2; i++) { const k = eligible[Math.floor(Math.random() * eligible.length)]; state.seeds[k] = (state.seeds[k] || 0) + 4; }
+    state.merchantUntil=Date.now()+180000;
     showToast(def.text, 'good'); play('upgrade');
   } else if (id === 'meteor') {
     const f = CONFIG.farmArea;
@@ -108,7 +108,10 @@ export function endClimate() {
   setRain(0);
 }
 
-export function initEvents() { restoreEventVisuals(); }
+export function initEvents() {
+  restoreEventVisuals();
+  bus.on('dayStart',day=>{if(day%2===0 && Date.now()>=state.merchantUntil)triggerEvent('merchant');});
+}
 
 // Chamado ao carregar um save com evento em andamento
 export function restoreEventVisuals() {

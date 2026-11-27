@@ -4,15 +4,19 @@ import { state, save } from './state.js';
 const drone = CONFIG.drone;
 export const modules = {
   battery: {
-    name: 'Bateria', prices: [160, 300, 480],
+    name: 'Bateria', prices: [160, 300, 480, 720, 1050],
     value: level => drone.cap + level * 20,
     format: value => value + ' de capacidade'
   },
   motor: {
-    name: 'Propulsores', prices: [200, 350, 550],
+    name: 'Propulsores', prices: [200, 350, 550, 800, 1150],
     value: level => 1 + level * 0.15,
     format: value => Math.round(value * 100) + '% da velocidade base'
   },
+  charger: {name:'Indutor de recarga',prices:[220,400,650], value:level=>1+level*.3,
+    format:value=>Math.round(value*100)+'% da taxa de recarga'},
+  regulator: {name:'Regulador de consumo',prices:[250,480,750],value:level=>1-level*.12,
+    format:value=>Math.round(value*100)+'% do consumo normal'},
   arm: {
     name: 'Braço agrícola', prices: [180, 320, 500],
     value: level => 0.9 - level * 0.15,

@@ -1,4 +1,5 @@
-import {hosted,api,enterCloud,settle} from './cloud.js';
+import {setSprite} from './pixel-sprites.js';
+import {hosted,api,enterCloud,enterVisitor,visiting,settle} from './cloud.js';
 import {saveKeyFor} from './accounts.js';
 import {PETS} from './actors.js';
 import {openDaily,openAlbum} from './retention.js';
@@ -198,11 +199,11 @@ export function updateHUD() {
     const b = $('slot' + i); if (!b) return;
     if (slot.type === 'can') {
       b.textContent=Math.floor(state.water);const img=b.parentElement.querySelector('img'),key='can-'+canLevel(state);
-      if(img.dataset.key!==key){img.dataset.key=key;img.src='assets/items/'+key+'.png';b.parentElement.title=slotLabel(slot);}
+      if(img.dataset.key!==key){img.dataset.key=key;setSprite(img,'assets/items/'+key+'.png');b.parentElement.title=slotLabel(slot);}
     }
     else if (slot.type === 'sapling') b.textContent = state.saplings[slot.tree];
     else b.textContent = slot.type==='shovel'?'':state.seeds[slot.crop];
-    const locked = (slot.type === 'seed' && state.level < CONFIG.crops[slot.crop].level) || (slot.type === 'sapling' && state.level < CONFIG.trees[slot.tree].level);
+    const locked = (slot.type === 'seed' && (state.level < CONFIG.crops[slot.crop].level || state.prestige.rank < (CONFIG.crops[slot.crop].prestige||0))) || (slot.type === 'sapling' && state.level < CONFIG.trees[slot.tree].level);
     b.parentElement.classList.toggle('locked', locked);
   });
 }
@@ -342,32 +343,6 @@ export function showResume(v) {
 export const isResumeVisible = () => resumeVisible;
 
 // ---------- Loja generica com abas ----------
-// Desenha miniaturas em uma grade de pixels e reutiliza o resultado a cada compra.
-const stallSprites=new Map();
-function pixelateProducts(list) {
-  for(const img of list.querySelectorAll('.product-image img')){
-    const src=img.src;
-    const replace=()=>{
-      let sprite=stallSprites.get(src);
-      if(!sprite){
-        const canvas=document.createElement('canvas');
-        canvas.width=32; canvas.height=32;
-        const ctx=canvas.getContext('2d');
-        if(!ctx || !img.naturalWidth)return;
-        const scale=32/Math.max(img.naturalWidth,img.naturalHeight);
-        const w=Math.round(img.naturalWidth*scale),h=Math.round(img.naturalHeight*scale);
-        ctx.drawImage(img,(32-w)>>1,(32-h)>>1,w,h);
-        sprite=canvas.toDataURL();
-        stallSprites.set(src,sprite);
-      }
-      img.src=sprite;
-    };
-    if(stallSprites.has(src))img.src=stallSprites.get(src);
-    else if(img.complete && img.naturalWidth)replace();
-    else img.addEventListener('load',replace,{once:true});
-  }
-}
-
 export function openShop(title, buildTabs) {
   openModal({
     id:'shop',title,wide:true,
@@ -386,7 +361,7 @@ export function openShop(title, buildTabs) {
       const list=el('div','list');
       tabs[index].items.forEach(it=>list.append(it instanceof HTMLElement?it:row(it)));
       box.append(list);
-      pixelateProducts(list);
+
     }
   });
 }
@@ -422,6 +397,7 @@ export function toggleInventory() {
         if(!grid.childElementCount)grid.append(el('p',null,'As plantas e os frutos que você colher aparecem aqui.'));
       }else if(index===2){
         card('can-'+canLevel(state),CANS[canLevel(state)-1].name,Math.floor(state.water)+' / '+waterCap()+' de água · Equipar',()=>{selectSlot(2);closeModal();});
+        for(const [key,tool] of Object.entries(CONFIG.tools))if(state.tools[key])card(key,tool.name,'Nível '+state.tools[key]+' · '+tool.desc);
         for(const [label,value] of [['Botas','Nível '+state.speedLevel],['Luvas','Nível '+state.yieldLevel],['Energia',Math.floor(state.energy)+' / '+maxEnergy()],['Pesquisa',Math.floor(state.rp)+' PP'],['Reputação',reputation()]])card(null,label,String(value));
       }else{
         const pets=petRows(false);grid.className='list';
@@ -661,6 +637,16 @@ export async function showLogin() {
   return new Promise(resolve=>{
     const box=$('login'),form=$('authForm'),msg=$('authMsg');
     let mode='login',busy=false;
+    const demo=$('guestPlay');
+    demo.hidden=!hosted;
+    demo.onclick=()=>{
+      if(busy)return;
+      let nickname=localStorage.getItem('orbital-visitante-nick');
+      if(!/^Visitante-[A-F0-9]{4}$/.test(nickname||'')){
+        nickname='Visitante-'+crypto.randomUUID().slice(0,4).toUpperCase();localStorage.setItem('orbital-visitante-nick',nickname);
+      }
+      enterVisitor();adminSession=false;box.classList.add('hidden');resolve({nick:nickname,visitor:true});
+    };
     $('authLocation').textContent=hosted?'Conta e fazenda ficam salvas neste servidor.':'Modo local. Contas e progresso ficam neste navegador.';
     $('tabRecover').hidden=!hosted;
     box.classList.remove('hidden');$('menu').classList.add('hidden');
@@ -740,7 +726,7 @@ export function bindUI(cb) {
   $('mpBtn').addEventListener('click', e => { e.preventDefault(); initAudio(); onMultiplayerCb(); });
   $('logoutBtn').addEventListener('click', async e => {
     e.preventDefault();
-    if(hosted){await settle();const r=await api('logout',{});if(!r.ok){showToast(r.error,'bad');return;}}
+    if(hosted&&!visiting){await settle();const r=await api('logout',{});if(!r.ok){showToast(r.error,'bad');return;}}
     setRemember('',false);onLogoutCb();
   });
   $('settingsBtn').addEventListener('click', e => { e.preventDefault(); initAudio(); openSettings(); });
@@ -767,7 +753,7 @@ export function bindUI(cb) {
 }
 
 function thumbnail(key){
-  const img=el('img','item-model');img.alt='';img.draggable=false;img.src='assets/items/'+key+'.png';return img;
+  const img=el('img','item-model');img.alt='';img.draggable=false;setSprite(img,'assets/items/'+key+'.png');return img;
 }
 export function petRows(shop){
   return Object.entries(PETS).filter(([key,def])=>(!def.admin||adminSession)&&(shop||state.adoptedPets.includes(key))).map(([key,def])=>{

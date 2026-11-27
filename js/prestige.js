@@ -1,6 +1,8 @@
+import {setSprite} from './pixel-sprites.js';
 // Prestigio ("Ascensao"): reinicia a fazenda em troca de Estrelas, gastas em melhorias permanentes
 // e que liberam plantas exclusivas. Conquistas, album, pets, recompensa diaria e configuracoes ficam.
 import { state, save, setObjective, perk, waterCap, maxEnergy } from './state.js';
+import {planetAt} from './planets.js';
 import { CONFIG } from './config.js';
 import { settle } from './cloud.js';
 import { play } from './audio.js';
@@ -17,7 +19,7 @@ export const canAscend = () => state.level >= requiredLevel();
 export function ascendGain() {
   if (!canAscend()) return 0;
   const base = Math.floor(Math.sqrt(runEarned() / 2500)) + Math.floor((state.level - requiredLevel()) / 2) + 1;
-  return Math.max(1, Math.round(base * (1 + 0.1 * state.prestige.rank)));
+  return Math.max(1, 4 + 2*state.prestige.rank + Math.round(base * (1 + 0.1 * state.prestige.rank)));
 }
 
 // A partir da quarta ascensão cada patente abre outro nível nos nove ramos.
@@ -39,23 +41,20 @@ export function buyPerk(id) {
 // Valores iniciais de uma fazenda nova (campos de progresso da partida)
 function freshRun() {
   const crops = Object.fromEntries(CONFIG.cropOrder.map(k => [k, 0]));
-  const lvl = 1 + 2 * perk('start');
+  const rank=state.prestige.rank;
+  const lvl = 1 + Math.min(8,rank) + 2 * perk('start');
   return {
-    money: 0, water: CONFIG.start.water, maxWater: CONFIG.start.maxWater,
-    energy: CONFIG.start.energy, speedLevel: 1, yieldLevel: 1,
-    seeds: { ...crops, lettuce: 3 }, crops: { ...crops },
+    money: 200*rank, water: waterCap(),
+    energy: maxEnergy(),
+    seeds: { ...crops, lettuce: 6+rank, strawberry: 3+rank }, crops: { ...crops },
     products: Object.fromEntries(Object.keys(CONFIG.products).map(k => [k, 0])),
-    crystals: 0,
     saplings: Object.fromEntries(CONFIG.treeOrder.map(k => [k, 0])), fruits: Object.fromEntries(CONFIG.treeOrder.map(k => [k, 0])), mutated: {},
     trees: [], nextTreeId: 1,
-    land: { expand: 1, soil: 0, orchard: 0 }, hotbarPage: 0,
     level: lvl, xp: 0, xpNeeded: Math.round(40 * Math.pow(1.4, Math.min(11,lvl - 1))) + 240*Math.max(0,lvl-12),
     time: 8, day: 1, harvestsToday: 0,
-    rp: 0, research: {},
-    structures: [], nextStructureId: 1, drones: [], nextDroneId: 1,
     contracts: { active: [], done: 0, nextSpawn: 20, nextId: 1 },
     event: null, nextEventIn: 150, boom: null,
-    islandUnlocked: false, islandVisited: false, pickups: [], nextPickupId: 1,
+    merchantUntil:0, pickups: [], nextPickupId: 1,
     plots: [], savedPlots: []
   };
 }
@@ -86,12 +85,16 @@ export function openPrestige() {
       const { box, index } = makeTabs(body, ['Ascensão', 'Árvore de habilidades', 'Desbloqueios']);
       if (index === 0) {
         const gain = ascendGain(), ok = canAscend();
-        box.append(el('p', 'hint', 'Reinicia dinheiro, nivel, canteiros, estruturas, drones e pesquisas. Mantem estrelas, melhorias, album, conquistas, pets e recompensa diaria.'));
+        const rank=p.rank+1;
+        box.append(section('Próximo destino · '+planetAt(rank).name),
+          el('p','hint','Você leva construções, drones e módulos, terreno, equipamentos, pesquisas, cristais, pets e coleção.'),
+          el('p','hint','A safra termina. Saldo, inventário agrícola, árvores, canteiros e contratos são reiniciados. Você chega com '+200*rank+' CR, '+(6+rank)+' alfaces e '+(3+rank)+' morangos em sementes.'),
+          el('p','hint','Bônus total no novo mundo: +'+10*rank+'% de crescimento, +'+15*rank+'% de XP base e +'+25*rank+' espaços de estoque.'));
         box.append(progressBar(Math.min(1, state.level / requiredLevel()), ok ? 'gold' : '', 'Nivel ' + Math.min(state.level, requiredLevel()) + ' / ' + requiredLevel()));
         const list = el('div', 'list');
         list.append(row({
           title: 'Ascender', locked: !ok, tag: ok ? '+' + gain + ' ESTRELAS' : 'NIVEL ' + requiredLevel(), tagCls: ok ? 'good' : 'bad',
-          desc: ok ? 'Ganho desta partida: ' + runEarned().toLocaleString('pt-BR') + ' CR faturados e nivel ' + state.level + '. Cada ascensao anterior da +10% de estrelas.' : 'Chegue ao nivel ' + requiredLevel() + ' para ascender.',
+          desc: ok ? 'Ganho desta partida: ' + runEarned().toLocaleString('pt-BR') + ' CR faturados e nivel ' + state.level + '. A recompensa inclui um bônus fixo crescente por ascensão.' : 'Chegue ao nivel ' + requiredLevel() + ' para ascender.',
           buttons: [{ label: confirming ? 'Confirmar reinicio' : 'Ascender', cls: confirming ? 'danger' : '', disabled: !ok,
             onClick: async () => { if (!confirming) { confirming = true; return; } await ascend(); return 'keep'; } }]
         }));
@@ -108,9 +111,10 @@ export function openPrestige() {
           list.append(row({
             thumb: open ? k : undefined, color: open ? undefined : c.color, title: open ? c.name : '???', locked: !open, done: open,
             tag: open ? 'LIBERADA' : 'PRESTIGIO ' + c.prestige, tagCls: open ? 'good' : 'bad',
-            desc: open ? 'Venda: ' + c.sellPrice + ' CR  |  Colheita: ' + c.growTime + 's  |  Compre na Loja Geral (nivel ' + c.level + ').' : 'Ascenda ' + c.prestige + ' vez' + (c.prestige > 1 ? 'es' : '') + ' para liberar.'
+            desc: c.planet ? 'Sementes da carroça · Origem: '+c.planet : open ? 'Venda: ' + c.sellPrice + ' CR  |  Colheita: ' + c.growTime + 's  |  '+(c.planet?'Na carroça':'Na Loja Geral')+' (nível ' + c.level + ').' : 'Ascenda ' + c.prestige + ' vez' + (c.prestige > 1 ? 'es' : '') + ' para liberar.'
           }));
         }
+        for(const [i,name] of ['Regador de névoa e célula de plasma','Regador de magma e lente de campo','Regador gravitacional e pérola de Nix'].entries())list.append(row({title:planetAt(i+1).name,desc:name,tag:'PRESTÍGIO '+(i+1)}));
         for(const offer of supplies)list.append(row({title:offer.name,desc:offer.description,tag:'PRESTÍGIO '+offer.rank}));
         box.append(list);
       }
@@ -164,7 +168,7 @@ function drawSkills(box, selected, remember){
       const def=P().perks.find(skill=>skill.id===id);
       const button=el('button','grove-rune'+(perk(id)?' learned':skillLock(id)?' locked':' available'));
       button.type='button';button.setAttribute('aria-label',def.name+', nível '+perk(id));
-      const img=el('img');img.src='assets/skills/'+id+'.png';img.alt='';
+      const img=el('img');setSprite(img,'assets/skills/'+id+'.png');img.alt='';
       button.append(img,el('span','',String(perk(id))));
       button.onclick=()=>select(id);lane.append(button);nodes.set(id,button);
     }

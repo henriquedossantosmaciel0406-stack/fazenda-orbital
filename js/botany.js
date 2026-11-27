@@ -77,7 +77,7 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
   const {leaf,rod,oval,gem,part}=tools(group,leafKind);
   const base=CONFIG.crops[key].color;
   const col=sick ? 0xB99550 : mutation ? blend(base,mutation.color,0.65) : base;
-  const greens={radish:0x51894F,okra:0x37865F,pineapple:0x3E877D,lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,prism:0x2E8F86,sunflower:0x4F8C3A,voidberry:0x4A4F9A,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
+  const greens={miralume:0x406e77,heliobell:0x6c804c,nixpearl:0x565782,radish:0x51894F,okra:0x37865F,pineapple:0x3E877D,lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,prism:0x2E8F86,sunflower:0x4F8C3A,voidberry:0x4A4F9A,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
   const fern=sick?0x817346:greens[key],mint=sick?0xADA053:blend(fern,0xEBF997,.48);
   const scale=0.32+0.68*g, ripe=g>0.55;
   group.scale.setScalar(scale);
@@ -198,6 +198,17 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
     } else for(let i=0;i<4;i++) leaf(0,0.16+i*0.24,0,i*spiral,0.67,0.15,0.34,mint);
     for(let j=0;j<3;j++) ring(0,h+j*0.04,0,lotus?8-j:11-j,0.72-j*0.16,lotus?0.21:0.125,1.2-g*(lotus?0.95:1.25)+j*0.25,blend(col,0xFFF1DE,j*0.29),j*0.37);
     gem(0,h+0.18,0,0.17,0.21,0.17,0xFFDB77);
+  } else if(key==='miralume'||key==='heliobell'||key==='nixpearl'){
+    ring(0,.12,0,7,.74,.18,.54,fern);
+    const stalks=key==='nixpearl'?1:3;
+    for(let i=0;i<stalks;i++){
+      const a=i*TAU/3,x=stalks===1?0:.48*Math.cos(a),z=stalks===1?0:.48*Math.sin(a),h=.95+i*.22;
+      rod([0,.1,0],[x,h,z],.06,mint);
+      if(!ripe){gem(x,h,z,.12,.21,.12,fern);continue;}
+      if(key==='miralume'){oval(x,h,z,.21,.33,.21,col);ring(x,h+.22,z,5,.26,.075,-.6,fern);}
+      if(key==='heliobell'){part(geo('cyl',.13,.32,.39,8),col,x,h,z);gem(x,h-.24,z,.09,.15,.09,0xffda80);}
+      if(key==='nixpearl'){ring(x,h,z,8,.64,.19,.55,col);oval(x,h+.15,z,.28,.3,.28,0xf5dcff);}
+    }
   } else if (key==='prism') {
     rod([0,0,0],[0,1.5,0],0.07,fern);
     for(let i=0;i<6;i++) leaf(0,0.2+i*0.2,0,i*spiral,0.62,0.14,0.4,i%2?mint:fern);

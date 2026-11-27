@@ -1,3 +1,4 @@
+import {motionLinks} from './motion-link.js';
 // O transporte HTTP usa a mesma origem do jogo. Uma queda curta repete o mesmo
 // lote com o mesmo número, inclusive quando o servidor já confirmou um presente.
 export async function connectHttpRoom(op,code,handlers){
@@ -8,14 +9,15 @@ export async function connectHttpRoom(op,code,handlers){
     if(!response.ok||!body.ok)throw Object.assign(new Error(body.error||'Falha no servidor de salas.'),{status:response.status});
     return body;
   }
-  const {id,token,size}=await request({op,compact:true});
+  const {id,token,size,readOnlyPoll}=await request({op,compact:true,rtc:typeof RTCPeerConnection==='function'});
   let active=true,timer,seq=1,after=0,pending=null,failures=0,alone=size===1;
   const queue=[];
   const known={};
   let lastPoll=0,movingUntil=0;
   let inFlight=false, due=Infinity, retrying=false;
+  const motion=motionLinks(id,(to,description)=>enqueue({to,msg:{t:'ice',description}}),handlers.onMsg);
   function schedule(ms){
-    ms=Math.max(ms,90-(performance.now()-lastPoll));
+    ms=Math.max(ms,180-(performance.now()-lastPoll));
     const deadline=performance.now()+ms;
     if(!active || inFlight || deadline>=due)return;
     clearTimeout(timer);due=deadline;timer=setTimeout(poll,ms);
@@ -23,6 +25,10 @@ export async function connectHttpRoom(op,code,handlers){
   function enqueue(packet){
     if(!active)return;
     const m=packet.msg;
+    if(!packet.to&&!packet.except && (m.t==='pos'||m.t==='sync')){
+      if(alone)return;
+      if(motion.send(m))return;
+    }
     if(['pos','sync','farm'].includes(m.t)){
       const i=queue.findIndex(p=>p.to===packet.to&&p.except===packet.except&&p.msg.t===m.t&&p.msg.id===m.id);
       if(i!==-1)queue.splice(i,1);
@@ -32,7 +38,7 @@ export async function connectHttpRoom(op,code,handlers){
   }
   function stop(){
     if(!active)return;
-    active=false;clearTimeout(timer);removeEventListener('pagehide',close);
+    active=false;motion.close();clearTimeout(timer);removeEventListener('pagehide',close);
   }
   function close(){
     if(!active)return;stop();request({op:'leave',id,token},true).catch(()=>{});
@@ -45,13 +51,16 @@ export async function connectHttpRoom(op,code,handlers){
         let n=0;pending=[];
         while(queue.length&&pending.length<48){const p=queue[0],len=JSON.stringify(p).length;if(n+len>160000&&pending.length)break;n+=len;pending.push(queue.shift());}
       }
-      const reply=await request({op:'poll',id,token,seq,after,known,packets:pending});
+      const idle=!!readOnlyPoll && pending.length===0;
+      const reply=await request({op:'poll',id,token,seq,after,known,idle,packets:pending});
       if(!active)return;
-      seq++;pending=null;failures=0;retrying=false;alone=reply.size===1;
+      if(!idle)seq++;
+      pending=null;failures=0;retrying=false;alone=reply.size===1;
+      motion.members(reply.peers||[]);
       for(const event of reply.events){
         if(!active)break;
         if(event.msg?.t==='pos')movingUntil=performance.now()+450;
-        after=event.cursor;if(event.admin)handlers.onAdmin(event.admin);else if(event.gone){delete known[event.from];handlers.onGone(event.from);}else if(event.msg?.t==='bye'){delete known[event.msg.id];handlers.onMsg(event.from,event.msg);}else handlers.onMsg(event.from,event.msg);
+        after=event.cursor;if(event.ice){void motion.accept(event.from,event.ice);}else if(event.admin)handlers.onAdmin(event.admin);else if(event.gone){delete known[event.from];handlers.onGone(event.from);}else if(event.msg?.t==='bye'){delete known[event.msg.id];handlers.onMsg(event.from,event.msg);}else handlers.onMsg(event.from,event.msg);
       }
       for(const pose of reply.poses||[]){
         known[pose.id]=pose.version;
@@ -59,7 +68,7 @@ export async function connectHttpRoom(op,code,handlers){
         handlers.onMsg(pose.from,pose.msg);
       }
       const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
-      const idleDelay=alone?1500:performance.now()<movingUntil?95:300;
+      const idleDelay=alone?2400:motion.ready()?2400:performance.now()<movingUntil?180:420;
       delay=reply.events.length>=64||(!alone&&urgent)?12:idleDelay;
     }catch(e){
       if(!active)return;

@@ -16,10 +16,13 @@ async function redis(...command){
   const token=process.env.UPSTASH_REDIS_REST_TOKEN||process.env.KV_REST_API_TOKEN;
   if(!url||!token)throw fail(503,'O banco de dados do jogo ainda não está conectado ao projeto.');
   const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(command),signal:AbortSignal.timeout(7000)});
+  const data=await response.json().catch(()=>({}));
+  if(/max requests limit exceeded|monthly (?:command|request).*limit|monthly quota/i.test(data?.error||'')){
+    throw fail(503,'A cota mensal do banco acabou. Sua conta continua guardada. Você pode jogar como visitante neste aparelho.');
+  }
   if(response.status===429)throw fail(429,'Banco ocupado. Aguarde um instante.');
   if(!response.ok)throw fail(503,'O banco do jogo está indisponível. Tente de novo.');
-  const data=await response.json();
-  if(data.error)throw fail(503,'O banco não conseguiu processar a operação.');
+  if(data.error||!('result' in data))throw fail(503,'O banco não conseguiu processar a operação.');
   return data.result;
 }
 async function read(nick){
