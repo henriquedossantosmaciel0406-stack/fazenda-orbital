@@ -41,7 +41,7 @@ function freshRun() {
   const crops = Object.fromEntries(CONFIG.cropOrder.map(k => [k, 0]));
   const lvl = 1 + 2 * perk('start');
   return {
-    money: CONFIG.start.money + 400 * perk('cash'), water: CONFIG.start.water, maxWater: CONFIG.start.maxWater,
+    money: 0, water: CONFIG.start.water, maxWater: CONFIG.start.maxWater,
     energy: CONFIG.start.energy, speedLevel: 1, yieldLevel: 1,
     seeds: { ...crops, lettuce: 3 }, crops: { ...crops },
     products: Object.fromEntries(Object.keys(CONFIG.products).map(k => [k, 0])),
@@ -70,6 +70,7 @@ export async function ascend() {
   state.activePet = state.activePet || null;
   save();
   play('mission');
+  // A cópia local guarda a nova partida enquanto a fila da nuvem sincroniza.
   await settle();
   location.reload(); // recria o mundo a partir do save limpo
   return true;

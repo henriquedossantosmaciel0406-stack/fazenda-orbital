@@ -353,7 +353,7 @@ function treeBlock(key) {
   const d = CONFIG.trees[key];
   if (state.level < d.level) return 'Nivel ' + d.level;
   if (state.saplings[key] <= 0) return 'Sem mudas';
-  if (state.trees.length >= treeLimit()) return 'Limite de ' + treeLimit() + ' arvores (melhore o Pomar)';
+
   return null;
 }
 
@@ -773,8 +773,8 @@ function openGeneralStore() {
       };
     });
     const treeItems = [row({
-      title: 'Pomar: ' + state.trees.length + ' / ' + treeLimit() + ' arvores', desc: 'Compre mudas, selecione-as na hotbar (Tab troca de pagina) e clique em um ponto livre da fazenda. Regue para acelerar. Cada arvore madura da varios frutos repetidamente.',
-      bar: { frac: state.trees.length / treeLimit(), cls: 'gold' }
+      title: 'Pomar: ' + state.trees.length + ' árvores', desc: 'Compre mudas, selecione-as na hotbar (Tab troca de pagina) e clique em um ponto livre da fazenda. Regue para acelerar. Cada arvore madura da varios frutos repetidamente.',
+
     })];
     CONFIG.treeOrder.forEach(k => {
       const d = CONFIG.trees[k], locked = state.level < d.level;
@@ -788,7 +788,7 @@ function openGeneralStore() {
         ]
       });
     });
-    const landItems = ['expand', 'soil', 'orchard'].map(k => {
+    const landItems = ['expand', 'soil'].map(k => {
       const def = CONFIG.land[k], lvl = state.land[k], nx = landNext(k);
       const frac = k === 'expand' ? (lvl - 1) / (def.max - 1) : lvl / def.max;
       let desc = def.desc;
@@ -1051,6 +1051,7 @@ function promptFor() {
     }
     case 'tree': {
       const d = target.ref, def = CONFIG.trees[d.type];
+      if(HOTBAR[state.selectedSlot]?.type==='shovel')return 'Retirar '+def.name+' e guardar a muda';
       if (d.progress < def.growTime) return 'E - Regar ' + def.name + ' (' + Math.floor(d.progress / def.growTime * 100) + '%)';
       return d.fruits > 0 ? 'E - Colher ' + d.fruits + ' ' + def.fruit : 'E - Regar ' + def.name + ' (proximo fruto em ' + Math.max(0, Math.ceil(def.fruitEvery - d.fruitT)) + 's)';
     }
@@ -1071,7 +1072,15 @@ function interact() {
   const r = target.ref;
   switch (target.type) {
     case 'plot': interactPlot(r); break;
-    case 'tree': if (r.fruits > 0) harvestTree(r, false); else if (!waterTree(r, false)) { if (r.water >= 6) showToast('A arvore ja esta bem regada', 'info'); else { showToast('Sem agua no regador. Use a bomba de agua.', 'bad'); play('error'); } } break;
+    case 'tree': if(HOTBAR[state.selectedSlot]?.type==='shovel'){
+      const i=trees.findIndex(t=>t.data===r),j=state.trees.indexOf(r);
+      if(i<0||j<0)break;
+      scene.remove(trees[i].group);trees.splice(i,1);state.trees.splice(j,1);
+      const collider=world.colliders.findIndex(c=>c.x===r.x&&c.z===r.z&&c.radius===.55);
+      if(collider>=0)world.colliders.splice(collider,1);
+      state.saplings[r.type]++;r.fruits=0;target.type=null;save();
+      showToast('Árvore retirada. Muda guardada na mochila.','good');break;
+    } if (r.fruits > 0) harvestTree(r, false); else if (!waterTree(r, false)) { if (r.water >= 6) showToast('A arvore ja esta bem regada', 'info'); else { showToast('Sem agua no regador. Use a bomba de agua.', 'bad'); play('error'); } } break;
     case 'structure': openStructurePanel(r); break;
     case 'pickup': collectPickup(r); break;
     case 'crystal': mineCrystal(r); break;

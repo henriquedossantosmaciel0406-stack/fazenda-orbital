@@ -223,7 +223,7 @@ function updateOne(e, dt, t) {
       if (dist < 0.5) { e.returning = false; d.status = 'charging'; e.taskText = 'Carregando'; }
     } else if (e.task) {
       const plot = e.task.plot;
-      if (!taskStillValid(e.task)) { releaseTask(e); }
+      if ((e.task.type.startsWith('tree') && !api.trees.includes(plot)) || !taskStillValid(e.task)) { releaseTask(e); }
       else {
         const dist = moveTo(e, plot.x, D.height - (e.work > 0 ? 1.4 : 0), plot.z, dt, speed);
         if (dist < 0.45) {

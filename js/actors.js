@@ -209,7 +209,30 @@ export function followPet(pet,owner,dt,t,world){
   }
   p.y+=(gy(p.x,p.z)-p.y)*Math.min(1,dt*14); // acompanha o relevo: nunca afunda no solo, calcada ou estrada
   const pace=Math.min(1,speed/2),step=Math.sin(t*(data.type==='turtle'?6:12));
-  data.body.position.y=Math.abs(step)*pace*(data.type==='rabbit'?0.18:0.046);
+  const idle=1-pace;
+  data.body.position.y=Math.abs(step)*pace*(data.type==='rabbit'?.18:.035);
+  data.body.rotation.z=0;
+  data.head.rotation.y=0;
+  if(data.type==='cat'){
+    data.head.rotation.y=idle*.34*Math.sin(t*1.8);
+    data.tail.rotation.x=.16*Math.sin(t*2.4);
+  }else if(data.type==='dog'){
+    data.body.rotation.x=.095*pace*Math.cos(t*12);
+    data.head.rotation.z=idle*.19*Math.sin(t*2.2);
+  }else if(data.type==='rabbit'){
+    data.body.rotation.x=.24*pace*Math.cos(t*12);
+    data.head.position.y=anatomies.rabbit.head[1]+.016*idle*Math.sin(t*10);
+  }else if(data.type==='fox'){
+    data.head.rotation.y=.17*Math.sin(t*4);
+    data.tail.rotation.x=.23+.14*pace*Math.cos(t*12);
+  }else if(data.type==='turtle'){
+    data.body.rotation.z=.095*pace*step;
+    data.head.position.z=.38+.045*Math.sin(t*2);
+  }else if(data.type==='axolotl'){
+    data.body.rotation.y=.10*Math.sin(t*5);
+    data.tail.rotation.x=.10*Math.cos(t*5);
+    data.head.rotation.z=.065*Math.sin(t*5);
+  }
   data.tail.rotation.y=Math.sin(t*(data.type==='dog'?11:3))*(data.type==='turtle'?.09:.31);
   data.head.rotation.x=Math.sin(t*2)*0.065;
   data.legs.forEach((leg,i)=>{const phase=data.type==='rabbit'?(i%2?1:-1):(i===1||i===2?-1:1);leg.rotation.x=phase*step*pace*.60;});

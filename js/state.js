@@ -20,7 +20,8 @@ export const HOTBAR = [
   { type: 'seed', crop: 'strawberry' },
   { type: 'can' },
   ...CONFIG.cropOrder.filter(k => k !== 'lettuce' && k !== 'strawberry').map(k => ({ type: 'seed', crop: k })),
-  ...CONFIG.treeOrder.map(k => ({ type: 'sapling', tree: k }))
+  ...CONFIG.treeOrder.map(k => ({ type: 'sapling', tree: k })),
+  {type:'shovel'}
 ];
 export const HOTBAR_PAGES = Math.ceil(HOTBAR.length / CONFIG.hotbarPageSize);
 
@@ -93,7 +94,7 @@ export function reputation() {
 }
 export const perk = id => (state.prestige && state.prestige.upgrades[id]) || 0;
 export const cropUnlocked = c => state.level >= c.level && state.prestige.rank >= (c.prestige || 0);
-export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market'));
+export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market') + 0.04 * perk('cash'));
 export const stockLimit = () => CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
 export const maxEnergy = () => CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
 export function stockUsed() {

@@ -202,7 +202,7 @@ export const CONFIG = {
       { id: 'xp',     name: 'Mente brilhante',    desc: '+10% de XP por nivel',                  max: 5,  base: 2, step: 1 },
       { id: 'water',  name: 'Reservatorio eterno', desc: '+10 de capacidade de agua por nivel',  max: 5,  base: 2, step: 1 },
       { id: 'energy', name: 'Folego infinito',    desc: '+15 de energia maxima por nivel',       max: 5,  base: 2, step: 1 },
-      { id: 'cash',   name: 'Heranca',            desc: 'Recomeca com +400 CR por nivel',        max: 5,  base: 1, step: 1 },
+      { id: 'cash',   name: 'Heranca',            desc: 'Ganhe +4% em vendas por nível',        max: 5,  base: 1, step: 1 },
       { id: 'start',  name: 'Atalho do veterano', desc: 'Recomeca 2 niveis acima por nivel',     max: 3,  base: 4, step: 3 }
     ]
   },

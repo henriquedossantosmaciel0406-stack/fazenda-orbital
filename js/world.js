@@ -444,6 +444,18 @@ export function createWorld(scene) {
   ground.position.y = -4; ground.receiveShadow = true; scene.add(ground);
   world.groundMeshes.push(ground);
   const water = M(geo('plane', 2400, 2400), new THREE.MeshToonMaterial({ map: seaPaint(), gradientMap: toonGradient }));
+  const tide={value:0};
+  water.material.onBeforeCompile=shader=>{
+    shader.uniforms.seaTime=tide;
+    shader.vertexShader='varying vec2 seaXZ;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nseaXZ=position.xy;');
+    shader.fragmentShader='uniform float seaTime;varying vec2 seaXZ;\n'+shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+      float swell=sin(seaXZ.y*.24+sin(seaXZ.x*.12+seaTime*.56)*1.8+seaTime*.87);
+      float glint=smoothstep(.88,.985,swell)*smoothstep(.12,.86,cos(seaXZ.x*.28-seaTime*.71));
+      float coast=max(abs(seaXZ.x),abs(seaXZ.y))-120.;
+      float shelf=1.-smoothstep(0.,22.,max(coast,0.));
+      diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.033,.21,.35),.49*(1.-shelf));
+      diffuseColor.rgb+=vec3(.22,.31,.29)*glint+vec3(.035,.13,.09)*shelf;`);
+  };
   water.rotation.x = -Math.PI / 2; water.position.y = -6; scene.add(water);
   world.water = water;
 
@@ -630,6 +642,7 @@ export function createWorld(scene) {
     elapsed += dt;
     for (let i = 0; i < PULSES.length; i++) { const p = PULSES[i]; p.m.emissiveIntensity = p.base + Math.sin(elapsed * p.speed) * p.amp * 0.5; }
     clouds.update(dt,time,weather,viewer);
+    tide.value=elapsed;
     water.material.map.offset.set((elapsed*.025)%1,(elapsed*.019)%1);
     water.position.y = -6 + Math.sin(elapsed * 0.5) * 0.12;
     // Ponte cresce quando a ilha e liberada

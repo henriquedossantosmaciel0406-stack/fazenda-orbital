@@ -469,6 +469,14 @@ function setupTransportHandlers() {
   return {
     onPeer() {},
     onAdmin(action){
+      if(action.assist==='irrigate'||action.assist==='cure'){
+        for(const plot of state.plots)if(plot.crop){
+          if(action.assist==='irrigate')plot.water=12;
+          else {plot.sick=false;plot.dirty=true;}
+        }
+        if(action.assist==='irrigate')for(const tree of state.trees)tree.water=8;
+        save();showToast(action.assist==='irrigate'?'Rick irrigou sua fazenda.':'Rick curou seus cultivos.','good');return;
+      }
       if(N.mode!=='host')return;
       applyWorldCommand(action);sendSync();
     },
@@ -535,7 +543,7 @@ export function leave(silent) {
 }
 
 export function requestRoomAdmin(action){
-  if(N.mode!=='guest'||!N.tr?.admin)throw new Error('Use o servidor oficial da fazenda para controlar esta sala.');
+  if((N.mode!=='guest'&&N.mode!=='host')||!N.tr?.admin)throw new Error('Use o servidor oficial da fazenda para controlar esta sala.');
   return N.tr.admin(action);
 }
 

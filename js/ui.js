@@ -103,6 +103,7 @@ export function setBuildHint(text) {
 // ---------- HUD ----------
 let hotbarBuilt = false;
 function slotLabel(slot) {
+  if(slot.type==='shovel')return 'Pá de transplante';
   return slot.type === 'can' ? CANS[canLevel(state)-1].name : slot.type === 'seed' ? 'Semente: ' + CONFIG.crops[slot.crop].name : 'Muda: ' + CONFIG.trees[slot.tree].name;
 }
 function buildHotbar() {
@@ -113,7 +114,7 @@ function buildHotbar() {
     d.dataset.slot = i;
     d.append(el('span', 'key', String(i % PAGE + 1)));
     d.title=slotLabel(slot);
-    const img=thumbnail(slot.crop||slot.tree||('can-'+canLevel(state)));d.append(img);
+    const img=thumbnail(slot.crop||slot.tree||(slot.type==='shovel'?'shovel':'can-'+canLevel(state)));d.append(img);
     const b = el('b', null, '0'); b.id = 'slot' + i;
     d.append(b);
     d.addEventListener('click', () => selectSlot(i));
@@ -200,7 +201,7 @@ export function updateHUD() {
       if(img.dataset.key!==key){img.dataset.key=key;img.src='assets/items/'+key+'.png';b.parentElement.title=slotLabel(slot);}
     }
     else if (slot.type === 'sapling') b.textContent = state.saplings[slot.tree];
-    else b.textContent = state.seeds[slot.crop];
+    else b.textContent = slot.type==='shovel'?'':state.seeds[slot.crop];
     const locked = (slot.type === 'seed' && state.level < CONFIG.crops[slot.crop].level) || (slot.type === 'sapling' && state.level < CONFIG.trees[slot.tree].level);
     b.parentElement.classList.toggle('locked', locked);
   });
@@ -408,6 +409,7 @@ export function toggleInventory() {
       if(index===0){
         HOTBAR.forEach((s,i)=>{
           if(s.type==='can')return;
+          if(s.type==='shovel'){card('shovel','Pá de transplante','Equipar',()=>{selectSlot(i);closeModal();});return;}
           const qty=s.type==='seed'?state.seeds[s.crop]:state.saplings[s.tree];
           if(qty>0)card(s.crop||s.tree,slotLabel(s),qty+' · Equipar',()=>{selectSlot(i);closeModal();});
         });
@@ -432,8 +434,9 @@ export function toggleInventory() {
 
 // ---------- Pausa, configuracoes, estatisticas, conquistas ----------
 let adminSession=false;
-function openAdmin(){
+async function openAdmin(){
   if(!adminSession)return;
+  const {netInfo,requestRoomAdmin}=await import('./net.js');
   const groups=[
     ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow','dew','pollen','solstice'].map(id=>[id,CONFIG.events[id].name])]],
     ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
@@ -459,7 +462,7 @@ function openAdmin(){
           if(pending)return;
           pending=true;
           try{
-            const {netInfo,requestRoomAdmin}=await import('./net.js');
+
             const local=['orchard','refill','irrigate','cure','sample','meteor','urgent','merchant'].includes(id);
             const action=isEvent?{event:id}:{command:id};
             if(!local && netInfo().mode==='guest'){
@@ -499,6 +502,17 @@ function openAdmin(){
           }catch{showToast('Falha ao enviar o comando. Tente de novo.','bad');}finally{pending=false;}
         }));
       }
+    }
+    body.append(section('Fazendas na sala'));
+    const players=netInfo().remotes;
+    if(!players.length)body.append(el('p','hint','Entre em uma sala com outro jogador para ajudar a fazenda dele.'));
+    for(const player of players){
+      body.append(row({title:player.nick,buttons:[['irrigate','Regar fazenda'],['cure','Curar cultivos']].map(([command,label])=>({
+        label,onClick:async()=>{
+          try{await requestRoomAdmin({player:player.id,command});showToast('Ajuda enviada para '+player.nick,'good');}
+          catch(error){showToast(error.message,'bad');}
+        }
+      }))}));
     }
     body.append(menuButton('Voltar',openPauseMenu,'secondary'));
   }});

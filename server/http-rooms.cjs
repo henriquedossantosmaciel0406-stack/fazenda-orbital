@@ -45,7 +45,9 @@ local me=members[id]
 if not me or me.proof~=proof then return {410,'Sua conexão com esta sala expirou.'} end
 if op=='admin' then
   if nick~='rick' or me.nick~=nick then return {403,'Comando exclusivo de Rick.'} end
-  post(room.host,id,'@admin:'..ARGV[9]);persist();return {200,'ok',total}
+  local recipient=ARGV[10]~='' and ARGV[10] or room.host
+  if not members[recipient] then return {409,'Jogador saiu da sala.'} end
+  post(recipient,id,'@admin:'..ARGV[9]);persist();return {200,'ok',total}
 end
 if op=='leave' then
   if id==room.host then erase() else members[id]=nil;redis.call('DEL',inbox(id));post(room.host,id,'@gone');persist() end
@@ -85,7 +87,11 @@ module.exports=async function handle(req,res){
       if(!identity.test(id)||typeof token!=='string'||!/^([a-f0-9]{64})$/.test(token))throw fail(401,'Sessão da sala inválida.');
       if(op==='admin'){
         const {a}=await accounts.current(req);
-        action=accounts.adminAction(a,d,true);
+        if(d.player){
+          if(a.nick.toLowerCase()!=='rick')throw fail(403,'Apenas Rick pode ajudar outra fazenda.');
+          if(!identity.test(d.player)||!['irrigate','cure'].includes(d.command))throw fail(400,'Ajuda inválida.');
+          action={assist:d.command};
+        }else action=accounts.adminAction(a,d,true);
         nick=a.nick.toLowerCase();
       }
       if(op==='poll'){
@@ -99,7 +105,7 @@ module.exports=async function handle(req,res){
         });
       }
     }
-    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets),JSON.stringify(action));
+    const result=await redis('EVAL',roomScript,1,'orbital:v1:{room-'+code+'}',op,id,hash(token),nick,Date.now(),d.seq||0,d.after||0,JSON.stringify(packets),JSON.stringify(action),op==='admin'&&d.player||'');
     const [status,message,size,rows]=result;
     if(status!==200)throw fail(status,message);
     if(admission)return send(200,{ok:true,id,token,size});
