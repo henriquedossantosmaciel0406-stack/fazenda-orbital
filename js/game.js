@@ -1,3 +1,4 @@
+import { cooperativeRows } from './prestige.js';
 import {CANS,canLevel,canEfficiency} from './gear.js';
 import {companion} from './actors.js';
 import {createWateringCan} from './watering-can.js';
@@ -8,10 +9,10 @@ import { fillCrop, fillTree, varySpecimen } from './botany.js';
 // recebem apenas as APIs necessarias, sem importacao circular.
 import * as THREE from 'three';
 import {
-  state, bus, HOTBAR, save, addXp, addMoney, reputation, priceBonus, stockFree, waterCap, maxEnergy,
+  state, bus, HOTBAR, save, addXp, addMoney, reputation, priceBonus, stockFree, waterCap, maxEnergy, perk, cropUnlocked,
   buildingLevel, eventActive, hasResearch, soilGrowth, soilDouble, treeLimit, mutKey
 } from './state.js';
-import { CONFIG } from './config.js';
+import { CONFIG, growthCredit, seedRarity } from './config.js';
 import {
   showToast, updateHUD, setPrompt, setBuildHint, openShop, openModal, closeModal, isModalOpen, modalId,
   toggleInventory, petRows, row, el, flash, selectSlot, isResumeVisible, openPauseMenu
@@ -61,7 +62,7 @@ const target = { type: null, ref: null, text: '' };
 //  MUTACOES
 // ======================================================================
 function rollMutation() {
-  const mult = hasResearch('genetics') ? 1.7 : 1;
+  const mult = (hasResearch('genetics') ? 1.7 : 1) * (1 + .12 * perk('mut')) * (eventActive('pollen') ? 1.35 : 1);
   for (const k of CONFIG.mutationOrder) {
     const m = CONFIG.mutations[k];
     if (state.level >= m.level && Math.random() < m.chance * mult) return k;
@@ -166,7 +167,7 @@ function buildCrop(plot) {
 
 // ---------- Acoes de canteiro (usadas pelo jogador e pelos drones) ----------
 function plantPlot(plot, cropKey, byDrone) {
-  if (!cropKey || plot.crop || state.seeds[cropKey] <= 0 || state.level < CONFIG.crops[cropKey].level) return false;
+  if (!cropKey || plot.crop || state.seeds[cropKey] <= 0 || !cropUnlocked(CONFIG.crops[cropKey])) return false;
   state.seeds[cropKey]--;
   plot.crop = cropKey; plot.progress = 0; plot.water = 0; plot.sick = false; plot.lastCrop = cropKey; plot.dirty = true;
   plot.mutation = rollMutation();
@@ -185,7 +186,7 @@ function waterPlot(plot, byDrone) {
   const used = Math.min(state.water, crop.waterUse);
   state.water -= used;
   plot.water = Math.min(12, plot.water + used*(byDrone?1:canEfficiency(state)));
-  plot.progress = Math.min(crop.growTime, plot.progress + used * 2);
+  plot.progress = Math.min(crop.growTime, plot.progress + growthCredit(plot,used * 2));
   const wasSick = plot.sick;
   plot.sick = false; plot.dirty = true;
   if (!byDrone) {
@@ -208,7 +209,7 @@ function harvestPlot(plot, byDrone) {
     return false;
   }
   const mutKeyName = plot.mutation, mut = mutKeyName ? CONFIG.mutations[mutKeyName] : null;
-  let amount = state.yieldLevel * (mut ? mut.yield : 1);
+  let amount = state.yieldLevel * (mut ? mut.yield : 1) * (1 + 0.1 * perk('yield'));
   if (hasResearch('organic') && Math.random() < 0.3) amount *= 2;
   if (Math.random() < soilDouble()) amount *= 2;
   amount = Math.min(amount, free);
@@ -231,7 +232,7 @@ function interactPlot(plot) {
     const slot = HOTBAR[state.selectedSlot];
     if (slot.type !== 'seed') { showToast('Selecione uma semente na hotbar (Tab troca de pagina)', 'bad'); play('error'); return; }
     const c = CONFIG.crops[slot.crop];
-    if (state.level < c.level) { showToast(c.name + ' exige nivel ' + c.level, 'bad'); play('error'); return; }
+    if (!cropUnlocked(c)) { showToast(c.name + (c.prestige && state.prestige.rank < c.prestige ? ' exige prestigio ' + c.prestige : ' exige nivel ' + c.level), 'bad'); play('error'); return; }
     if (state.seeds[slot.crop] <= 0) { showToast('Sem sementes de ' + c.name + '. Compre na Loja Geral.', 'bad'); play('error'); return; }
     plantPlot(plot, slot.crop, false);
   } else if (plot.progress >= CONFIG.crops[plot.crop].growTime) {
@@ -244,7 +245,7 @@ function interactPlot(plot) {
 
 function updatePlots(dt, t) {
   const irrigation = hasResearch('irrigation');
-  const gm = researchGrowth() * growthEventMult() * soilGrowth(), evap = evaporationMult();
+  const gm = researchGrowth() * growthEventMult() * soilGrowth() * (1 + 0.06 * perk('growth')), evap = evaporationMult();
   for (let i = 0; i < state.plots.length; i++) {
     const p = state.plots[i];
     if (!p.available) continue;
@@ -252,7 +253,7 @@ function updatePlots(dt, t) {
       const crop = CONFIG.crops[p.crop];
       p.water = Math.max(0, p.water - 0.04 * evap * dt);
       if (irrigation && p.water < 1.5) p.water = 1.5;
-      if (p.progress < crop.growTime) p.progress = Math.min(crop.growTime, p.progress + dt * (0.35 + p.water * 0.08) * gm * (p.sick ? 0.4 : 1));
+      if (p.progress < crop.growTime) p.progress = Math.min(crop.growTime, p.progress + growthCredit(p,dt * (0.35 + p.water * 0.08) * gm * (p.sick ? 0.4 : 1)));
       const gg = p.progress / crop.growTime;
       const key = p.crop + ':' + Math.min(5, Math.floor(gg * 5)) + (gg >= 1 ? 'r' : '') + (p.sick ? 's' : '') + (p.mutation ? ':' + p.mutation : '');
       if (p.dirty || key !== p.stageKey) { p.stageKey = key; p.dirty = false; buildCrop(p); }
@@ -475,7 +476,7 @@ function irrigatorPulse(inst) {
     if (cfg.water > 0 && state.water < cfg.water) break;
     state.water -= cfg.water;
     p.water = Math.min(12, p.water + crop.waterUse * 0.9);
-    p.progress = Math.min(crop.growTime, p.progress + crop.waterUse * 0.5);
+    p.progress = Math.min(crop.growTime, p.progress + growthCredit(p,crop.waterUse * 0.5));
     p.sick = false; p.dirty = true;
     spray(p.x, 0.65, p.z);
     watered++;
@@ -684,6 +685,7 @@ function produce(key, times) {
   if (n <= 0) { showToast('Ingredientes insuficientes', 'bad'); play('error'); return; }
   for (const k in p.from) state.crops[k] -= p.from[k] * n;
   state.products[key] += n;
+  bus.emit('craft', { key });
   addXp(3 * n);
   const f = instances.find(i => i.data.type === 'factory');
   if (f) burst(f.data.x, 3.5, f.data.z, 0xFFB74D, 18, 2.5, 3);
@@ -718,7 +720,7 @@ function openFactory() {
 
 function buySeed(k, n) {
   const c = CONFIG.crops[k], cost = c.seedCost * n;
-  if (state.level < c.level || state.money < cost) { play('error'); return; }
+  if (!cropUnlocked(c) || state.money < cost) { play('error'); return; }
   state.money -= cost; state.seeds[k] += n;
   play('buy'); showToast('Comprou ' + n + ' semente(s) de ' + c.name, 'good'); save();
 }
@@ -757,13 +759,13 @@ function structureRow(type) {
 function openGeneralStore() {
   openShop('Loja Geral', () => {
     const seeds = CONFIG.cropOrder.map(k => {
-      const c = CONFIG.crops[k], locked = state.level < c.level;
+      const c = CONFIG.crops[k], locked = !cropUnlocked(c);
       return {
         thumb:k, color: c.color, title: 'Semente de ' + c.name,
         species: {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática',radish:'Raiz arredondada',okra:'Vagem estriada',pineapple:'Fruto de coroa'}[k],
-        growing: [['Colheita',c.growTime+' s'],['Água',c.waterUse],['Venda',c.sellPrice+' CR']],
+        growing: [['Raridade',seedRarity(c)],['Colheita',c.growTime+' s'],['Água',c.waterUse],['Venda',c.sellPrice+' CR']],
         desc: 'Pacote de sementes · '+c.seedCost+' CR por unidade',
-        tag: locked ? 'NIVEL ' + c.level : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,
+        tag: locked ? (state.prestige.rank < (c.prestige || 0) ? 'PRESTIGIO ' + c.prestige : 'NIVEL ' + c.level) : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,
         buttons: [
           { label: 'Comprar 1', disabled: locked || state.money < c.seedCost, onClick: () => buySeed(k, 1) },
           { label: 'Comprar 5', disabled: locked || state.money < c.seedCost * 5, onClick: () => buySeed(k, 5) }
@@ -831,6 +833,7 @@ function openGeneralStore() {
       { name: 'Sementes', items: seeds },
       { name: 'Árvores', items: treeItems },
       { name: 'Regadores', items:cans },
+      { name: 'Cooperativa', items: cooperativeRows() },
       { name:'Pets',items:petRows(true) },
       { name: 'Terreno', items: landItems },
       { name: 'Irrigação', items: keys.filter(k => CONFIG.structures[k].irrigator).map(structureRow) },
@@ -941,7 +944,7 @@ function addPickupMesh(p) {
 function collectPickup(p) {
   state.pickups = state.pickups.filter(x => x !== p);
   const m = pickupMeshes.get(p.id); if (m) { scene.remove(m); pickupMeshes.delete(p.id); }
-  const pool = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level >= 3 && CONFIG.crops[k].level <= state.level + 2);
+  const pool = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level >= 3 && CONFIG.crops[k].level <= state.level + 2 && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
   const k = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'lettuce';
   const n = 2 + Math.floor(Math.random() * 3);
   state.seeds[k] += n; state.crystals += 1; state.rp += 3; addXp(60);

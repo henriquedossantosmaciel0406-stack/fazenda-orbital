@@ -165,7 +165,7 @@ export function cloudField(scene){
   const day=new THREE.Color(0xfffbef),night=new THREE.Color(0x7987aa),dusk=new THREE.Color(0xffc29c);
   let amount=0, gustTime=0;
   function update(dt,time,event,viewer){
-    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.85 : event==='rainbow' ? -.32 : 0;
+    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.85 : event==='rainbow' ? -.32 : event==='dew' ? .42 : event==='solstice' ? -.38 : 0;
     amount+=(target-amount)*(1-Math.exp(-dt*.23));
     const gust=uniforms.squall;
     gust.value+=((event==='tempest'?1:0)-gust.value)*(1-Math.exp(-dt*.34));

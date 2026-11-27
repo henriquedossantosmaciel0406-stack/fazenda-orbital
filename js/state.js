@@ -39,6 +39,9 @@ export const state = {
   crystals: 0,
   saplings: emptyTrees(), fruits: emptyTrees(), mutated: {},
   adoptedPets: [], activePet: null,
+  prestige: { rank: 0, stars: 0, total: 0, runStart: 0, upgrades: {} },
+  daily: { streak: 0, last: '', best: 0, total: 0 },
+  album: { crops: {}, mutations: {}, fruits: {}, products: {}, pets: {}, claimed: {} },
   trees: [], nextTreeId: 1,
   land: { expand: 1, soil: 0, orchard: 0 }, hotbarPage: 0,
   level: 1, xp: 0, xpNeeded: 40,
@@ -88,9 +91,11 @@ export function reputation() {
   r += state.land.expand * 2 + state.land.soil * 2;
   return Math.round(r);
 }
-export const priceBonus = () => 1 + Math.min(0.4, reputation() / 400);
+export const perk = id => (state.prestige && state.prestige.upgrades[id]) || 0;
+export const cropUnlocked = c => state.level >= c.level && state.prestige.rank >= (c.prestige || 0);
+export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market'));
 export const stockLimit = () => CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
-export const maxEnergy = () => CONFIG.baseMaxEnergy + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
+export const maxEnergy = () => CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
 export function stockUsed() {
   let n = 0;
   for (const k in state.crops) n += state.crops[k];
@@ -114,7 +119,7 @@ export function mitigation() {
 }
 export const eventActive = id => !!(state.event && state.event.id === id);
 // Capacidade efetiva de agua (a seca reduz a agua disponivel)
-export const waterCap = () => Math.max(1, Math.round(state.maxWater * (eventActive('drought') ? 1 - 0.5 * (1 - mitigation()) : 1)));
+export const waterCap = () => Math.max(1, Math.round((state.maxWater + 10 * perk('water')) * (eventActive('drought') ? 1 - 0.5 * (1 - mitigation()) : 1)));
 
 // ---------- Economia ----------
 export function addMoney(n) {
@@ -123,12 +128,11 @@ export function addMoney(n) {
 }
 export function addXp(amount) {
   if (special) return;
-  if (special) return;
-  state.xp += amount;
+  state.xp += Math.round(amount * (1 + 0.1 * perk('xp')));
   while (state.xp >= state.xpNeeded) {
     state.xp -= state.xpNeeded;
     state.level++;
-    state.xpNeeded = Math.round(state.xpNeeded * 1.4);
+    state.xpNeeded = state.level > 12 ? state.xpNeeded + 240 : Math.round(state.xpNeeded * 1.4);
     state.money += 75;
     bus.emit('level', state.level);
   }
@@ -152,7 +156,7 @@ export function save() {
     money: state.money, water: state.water, maxWater: state.maxWater, energy: state.energy,
     speedLevel: state.speedLevel, yieldLevel: state.yieldLevel,
     seeds: state.seeds, crops: state.crops, products: state.products, crystals: state.crystals,
-    saplings: state.saplings, fruits: state.fruits, mutated: state.mutated, land: state.land, hotbarPage: state.hotbarPage, nextTreeId: state.nextTreeId,
+    saplings: state.saplings, fruits: state.fruits, mutated: state.mutated, daily: state.daily, album: state.album, prestige: state.prestige, land: state.land, hotbarPage: state.hotbarPage, nextTreeId: state.nextTreeId,
     trees: state.trees.map(t => ({ id: t.id, type: t.type, x: t.x, z: t.z, progress: t.progress, fruits: t.fruits, fruitT: t.fruitT, water: t.water })),
     level: state.level, xp: state.xp, xpNeeded: state.xpNeeded,
     time: state.time, day: state.day, harvestsToday: state.harvestsToday,
@@ -183,7 +187,7 @@ export function load() {
     if (old && old.type === 'none') data.objectiveIndex = 1; // missao inicial ja concluida
     else if (old && old.type === 'plant') { data.objectiveIndex = 0; data.objectiveProgress = old.progress || 0; }
   }
-  const keep = ['seeds', 'crops', 'products', 'research', 'contracts', 'stats', 'achievements', 'settings', 'saplings', 'fruits', 'mutated', 'land'];
+  const keep = ['seeds', 'crops', 'products', 'research', 'contracts', 'stats', 'achievements', 'settings', 'saplings', 'fruits', 'mutated', 'land', 'daily', 'album', 'prestige'];
   for (const key of Object.keys(data)) {
     if (['expedition', 'plots', 'lettuceSeed', 'strawberrySeed', 'lettuce', 'strawberry', 'objective', 'version', 'objectiveProgress'].includes(key)) continue;
     if (keep.includes(key) && data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
@@ -198,6 +202,10 @@ export function load() {
   state.savedPlots = data.plots || [];
   state.settings = { ...defaultSettings(), ...state.settings };
   state.stats = { ...defaultStats(), ...state.stats };
+  state.prestige = { rank: 0, stars: 0, total: 0, runStart: 0, ...state.prestige, upgrades: { ...(state.prestige && state.prestige.upgrades) } };
+  state.daily = { streak: 0, last: '', best: 0, total: 0, ...state.daily };
+  const al = state.album || {};
+  state.album = { crops: {}, mutations: {}, fruits: {}, products: {}, pets: {}, claimed: {}, ...al };
   return true;
 }
 

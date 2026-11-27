@@ -139,3 +139,23 @@ Para a versão estática, selecione “Other”, deixe o comando de build vazio 
 - Casas: torres laterais afastadas das casas-domo, ovo e estufa (nao ficam mais coladas).
 - Colisao: casas tinham raio 7,5; agora colisao justa por corpo. Construcoes e arvores com colisao menor.
 - Grama nova (laminas curvas, escuras na base) e borboletas novas (4 asas, manchas, corpo, batida de asas).
+
+## Pets (v3)
+- Os 6 pets foram refeitos em estilo cartoon (cabecona, olhos grandes, bochechas, acessorios).
+- Pets agora seguem a altura do chao (solo, praca, estrada, ilha) via `world.surfaceY`, entao nao afundam mais.
+
+## Recompensa diaria e Album de colecao
+
+- Recompensa diaria (`js/retention.js`): abre ao entrar no jogo quando ha premio. Sequencia de 7 dias (dia 7 = 1500 CR + 5 cristais); depois do dia 7 o ciclo repete com bonus de ate +100%. Perdeu dias? Ate 3 dias perdidos podem ser recuperados pagando 150 CR por dia de sequencia; senao recomeca do dia 1. Usa a data local do aparelho. Salvo em `state.daily`.
+- Album de colecao: 5 abas (Plantas, Mutacoes, Frutas, Produtos, Pets) com contador "x/y coletados", espacos "???" para o que falta e bonus unico ao completar cada aba. Salvo em `state.album`; saves antigos sao preenchidos com o que o jogador ja possui.
+- Acesso: menu de pausa (ESC), botoes "Recompensa diaria" e "Album de colecao". Eventos novos no bus: `craft`, `adopt`, `gameStart`.
+- Saves antigos continuam validos (campos novos com valores padrao).
+
+## Prestigio (Ascensao)
+
+- Menu de pausa, botao "Prestigio" (`js/prestige.js`). A primeira ascensão exige nível 12. Cada prestígio aumenta o requisito em seis níveis.
+- Ascender reinicia dinheiro, nivel, canteiros, estruturas, drones, pesquisas e estoque. Ficam: estrelas, melhorias, album, conquistas, pets, recompensa diaria e configuracoes. A pagina recarrega para recriar o mundo.
+- Estrelas ganhas: raiz do faturamento da partida + bonus por nivel, +10% por ascensao anterior.
+- 9 habilidades em três ramos (Cultivo, Engenharia e Comércio), com pré-requisitos e níveis permanentes (colheita, crescimento, preco de venda, mutacao, XP, agua, energia, dinheiro inicial, nivel inicial). Definidas em `CONFIG.prestige.perks`.
+- 3 plantas exclusivas: Feijao prisma (1 ascensao), Girassol solar (2), Baga do vazio (3). Campo `prestige` em `CONFIG.crops`; modelos em `js/botany.js`, miniaturas em `assets/items`.
+- Save: novo campo `prestige`, saves antigos continuam validos.

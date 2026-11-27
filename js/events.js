@@ -10,6 +10,9 @@ import { createUrgent } from './contracts.js';
 // Aparencia do ceu/luz durante eventos (interpolada a cada quadro, sem alocar)
 export const weatherVisual = { color: new THREE.Color(0x000000), amount: 0, light: 1 };
 const TARGETS = {
+  pollen: {color:new THREE.Color(0xFDD98D),amount:.26,light:1.04},
+  dew: {color:new THREE.Color(0xABCFE0),amount:.36,light:.88},
+  solstice: {color:new THREE.Color(0xFFC476),amount:.33,light:1.13},
   tempest: {color:new THREE.Color(0x394866),amount:0.74,light:0.39},
   aurora: {color:new THREE.Color(0x69CBBC),amount:0.32,light:1.08},
   none:    { color: new THREE.Color(0x000000), amount: 0,    light: 1 },
@@ -23,10 +26,10 @@ const TARGETS = {
 let bannerTimer = 0, solarFlashTimer = 0;
 
 // ---- Multiplicadores consultados por outros sistemas ----
-export const growthEventMult = () => (eventActive('rain') ? 1.5 : eventActive('rainbow') ? 1.25 : 1);
-const GOOD = new Set(['rain', 'rainbow', 'festival','aurora']);
-export const evaporationMult = () => (eventActive('drought') ? 1 + 1.5 * (1 - mitigation()) : 1);
-export const energyEventMult = () => eventActive('aurora')?1.45:(eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : 1);
+export const growthEventMult = () => (eventActive('rain') ? 1.5 : eventActive('rainbow') ? 1.25 : eventActive('solstice') ? 1.20 : 1);
+const GOOD = new Set(['rain', 'rainbow', 'festival','aurora','pollen','dew','solstice']);
+export const evaporationMult = () => (eventActive('drought') ? 1 + 1.5 * (1 - mitigation()) : eventActive('dew') ? .5 : 1);
+export const energyEventMult = () => eventActive('aurora')?1.45:(eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : eventActive('solstice') ? 1.15 : 1);
 export const rainWaterGain = () => eventActive('tempest') ? 0.85 : (eventActive('rain') ? 0.4 : 0);
 export const sellEventMult = crop => (state.boom && state.boom.crop === crop ? state.boom.mult : 1) * (eventActive('festival') ? 1.25 : 1);
 
@@ -68,7 +71,7 @@ export function triggerEvent(id) {
     showToast(def.text, bad ? 'bad' : 'good');
     play(id === 'rain' ? 'rain' : GOOD.has(id) ? 'upgrade' : 'alert');
   } else if (id === 'boom') {
-    const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level);
+    const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
     const crop = eligible[Math.floor(Math.random() * eligible.length)];
     state.boom = { crop, mult: 1.6, left: def.duration };
     showToast('Mercado em alta: ' + CONFIG.crops[crop].name + ' vale 60% mais!', 'good');
@@ -78,7 +81,7 @@ export function triggerEvent(id) {
     showToast(def.text, 'event'); play('alert');
     bus.emit('urgentOrder', c);
   } else if (id === 'merchant') {
-    const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level);
+    const eligible = CONFIG.cropOrder.filter(k => CONFIG.crops[k].level <= state.level && state.prestige.rank >= (CONFIG.crops[k].prestige || 0));
     for (let i = 0; i < 2; i++) { const k = eligible[Math.floor(Math.random() * eligible.length)]; state.seeds[k] = (state.seeds[k] || 0) + 4; }
     showToast(def.text, 'good'); play('upgrade');
   } else if (id === 'meteor') {

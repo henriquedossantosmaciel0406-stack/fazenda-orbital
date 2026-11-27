@@ -1,6 +1,8 @@
 import {hosted,api,enterCloud,settle} from './cloud.js';
 import {saveKeyFor} from './accounts.js';
 import {PETS} from './actors.js';
+import {openDaily,openAlbum} from './retention.js';
+import {openPrestige} from './prestige.js';
 import {CANS,canLevel} from './gear.js';
 // Interface: HUD, notificacoes, janelas (modais), menus, configuracoes, conquistas e estatisticas.
 import { register, login, lastNick, autoLogin, setRemember } from './accounts.js';
@@ -433,10 +435,10 @@ let adminSession=false;
 function openAdmin(){
   if(!adminSession)return;
   const groups=[
-    ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow'].map(id=>[id,CONFIG.events[id].name])]],
+    ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow','dew','pollen','solstice'].map(id=>[id,CONFIG.events[id].name])]],
     ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
     ['Eventos da fazenda',['festival','boom','urgent','merchant','meteor'].map(id=>[id,CONFIG.events[id].name])],
-    ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia']]]
+    ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia'],['irrigate','Irrigar cultivos e pomar'],['cure','Curar plantas doentes'],['sample','Induzir mutação em uma planta']]]
   ];
   let pending=false;
   openModal({id:'admin',wide:true,title:'Observatório · ADM',hint:'Só Rick pode mudar o clima e a hora da sala. Pomar e recursos afetam sua própria fazenda.',build(body){
@@ -458,7 +460,7 @@ function openAdmin(){
           pending=true;
           try{
             const {netInfo,requestRoomAdmin}=await import('./net.js');
-            const local=['orchard','refill','meteor','urgent','merchant'].includes(id);
+            const local=['orchard','refill','irrigate','cure','sample','meteor','urgent','merchant'].includes(id);
             const action=isEvent?{event:id}:{command:id};
             if(!local && netInfo().mode==='guest'){
               await requestRoomAdmin(action);
@@ -471,7 +473,19 @@ function openAdmin(){
             const {triggerEvent,applyWorldCommand}=await import('./events.js');
             if(!local)applyWorldCommand(result);
             else if(result.event)triggerEvent(result.event);
-            else if(result.command==='refill'){
+            else if(result.command==='irrigate'){
+              for(const plot of state.plots)if(plot.crop)plot.water=12;
+              for(const tree of state.trees)tree.water=8;
+            }else if(result.command==='cure'){
+              for(const plot of state.plots)if(plot.sick){plot.sick=false;plot.dirty=true;}
+            }else if(result.command==='sample'){
+              const plot=state.plots.find(p=>p.crop && !p.mutation && p.progress<CONFIG.crops[p.crop].growTime);
+              if(!plot){showToast('Plante uma semente comum e aguarde o broto.','info');return;}
+              const options=CONFIG.mutationOrder.filter(k=>CONFIG.mutations[k].level<=state.level);
+              if(!options.length)return;
+              plot.mutation=options[Math.floor(Math.random()*options.length)];plot.dirty=true;
+              showToast(CONFIG.crops[plot.crop].name+' · '+CONFIG.mutations[plot.mutation].name,'good');
+            }else if(result.command==='refill'){
               state.water=waterCap();state.energy=maxEnergy();
             }else if(result.command==='orchard'){
               if(!state.trees.length){showToast('Plante uma muda primeiro.','info');return;}
@@ -509,6 +523,9 @@ export function openPauseMenu() {
         menuButton('Multiplayer', () => onMultiplayerCb(), 'secondary'),
         menuButton('Configuracoes', openSettings, 'secondary'),
         menuButton('Estatisticas', openStats, 'secondary'),
+        menuButton('Recompensa diaria', openDaily, 'secondary'),
+        menuButton('Album de colecao', openAlbum, 'secondary'),
+        menuButton('Prestigio', openPrestige, 'secondary'),
         menuButton('Conquistas', openAchievements, 'secondary'),
         menuButton('Sair', () => { save(); closeModal(false); onQuitCb(); }, 'secondary')
       );
@@ -694,6 +711,7 @@ export function bindUI(cb) {
     state.paused = false;
     onStartCb();
     updateHUD();
+    bus.emit('gameStart');
   });
   let confirmReset = false;
   $('resetBtn').addEventListener('click', async e => {
@@ -744,7 +762,7 @@ export function petRows(shop){
       buttons:[{label:active?'Descansar':owned?'Chamar':'Adotar',disabled:!owned&&state.money<def.cost,onClick:()=>{
         if(!state.adoptedPets.includes(key)){
           if(state.money<def.cost)return;
-          state.money-=def.cost;state.adoptedPets.push(key);
+          state.money-=def.cost;state.adoptedPets.push(key);bus.emit('adopt',{key});
         }
         state.activePet=active?null:key;save();play('buy');
         showToast(active?def.name+' foi descansar':def.name+' está com você','good');

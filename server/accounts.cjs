@@ -38,8 +38,8 @@ const view=a=>({ok:true,nick:a.nick,orbitalPass:a.nick.toLowerCase()==='rick',sa
 function adminAction(a,data,roomOnly=false){
   if(a.nick.toLowerCase()!=='rick')throw fail(403,'Comando exclusivo de Rick.');
   const commands=['clear','dawn','noon','sunset','night'];
-  const events=['tempest','aurora','rain','rainbow','festival','solar','drought','boom'];
-  if(!roomOnly){commands.push('orchard','refill');events.push('meteor','urgent','merchant');}
+  const events=['tempest','aurora','rain','rainbow','festival','solar','drought','boom','dew','pollen','solstice'];
+  if(!roomOnly){commands.push('orchard','refill','irrigate','cure', 'sample');events.push('meteor','urgent','merchant');}
   if(commands.includes(data.command))return {command:data.command};
   if(events.includes(data.event))return {event:data.event};
   throw fail(400,'Comando desconhecido.');

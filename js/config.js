@@ -13,11 +13,11 @@ export const CONFIG = {
   crystalPrice: 70,
   farmArea: { x0: -100, x1: -10, z0: -100, z1: 14 },
 
-  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus', 'radish', 'okra', 'pineapple'],
+  cropOrder: ['lettuce', 'strawberry', 'carrot', 'corn', 'tomato', 'mushroom', 'grape', 'flower', 'pumpkin', 'melon', 'pepper', 'lotus', 'radish', 'okra', 'pineapple', 'prism', 'sunflower', 'voidberry'],
   crops: {
     radish:     { name: 'Rabanete rubi', short: 'RUB', seedCost: 6, sellPrice: 17, growTime: 20, waterUse: 1, color: 0xE44E7F, level: 1, xp: 8, rp: 1 },
     okra:       { name: 'Quiabo de órbita', short: 'QUI', seedCost: 42, sellPrice: 136, growTime: 76, waterUse: 2, color: 0x8BDF89, level: 4, xp: 30, rp: 2 },
-    pineapple:  { name: 'Abacaxi eclipse', short: 'ABA', seedCost: 180, sellPrice: 650, growTime: 200, waterUse: 5, color: 0xF8AA39, level: 7, xp: 112, rp: 6 },
+    pineapple:  { name: 'Abacaxi eclipse', short: 'ABA', seedCost: 180, sellPrice: 650, growTime: 184, waterUse: 5, color: 0xF8AA39, level: 7, xp: 112, rp: 6 },
     lettuce:    { name: 'Alface',            short: 'ALF', seedCost: 5,   sellPrice: 14,   growTime: 18,  waterUse: 1, color: 0x7ED957, level: 1,  xp: 8,   rp: 1 },
     strawberry: { name: 'Morango',           short: 'MOR', seedCost: 12,  sellPrice: 38,   growTime: 35,  waterUse: 2, color: 0xFF6FA5, level: 1,  xp: 12,  rp: 1 },
     carrot:     { name: 'Cenoura solar',     short: 'CEN', seedCost: 8,   sellPrice: 26,   growTime: 26,  waterUse: 1, color: 0xFF8A2A, level: 2,  xp: 10,  rp: 1 },
@@ -29,18 +29,24 @@ export const CONFIG = {
     pumpkin:    { name: 'Abobora aurora',    short: 'ABO', seedCost: 115, sellPrice: 410,  growTime: 140, waterUse: 5, color: 0xFFB347, level: 6,  xp: 80,  rp: 5 },
     melon:      { name: 'Melancia lunar',    short: 'MEL', seedCost: 150, sellPrice: 540,  growTime: 170, waterUse: 6, color: 0x6BFFB0, level: 7,  xp: 100, rp: 6 },
     pepper:     { name: 'Pimenta nova',      short: 'PIM', seedCost: 210, sellPrice: 720,  growTime: 190, waterUse: 6, color: 0xFF3B3B, level: 8,  xp: 130, rp: 7 },
+    prism:      { name: 'Feijao prisma',    short: 'PRI', seedCost: 900,  sellPrice: 1900, growTime: 250, waterUse: 6, color: 0x63F2D2, level: 6,  xp: 240, rp: 10, prestige: 1 },
+    sunflower:  { name: 'Girassol solar',    short: 'GIR', seedCost: 1500, sellPrice: 3000, growTime: 300, waterUse: 7, color: 0xFFC53D, level: 8,  xp: 340, rp: 12, prestige: 2 },
+    voidberry:  { name: 'Baga do vazio',     short: 'VAZ', seedCost: 2400, sellPrice: 4700, growTime: 360, waterUse: 8, color: 0x7A5CFF, level: 10, xp: 480, rp: 14, prestige: 3 },
     lotus:      { name: 'Lotus estelar',     short: 'LOT', seedCost: 340, sellPrice: 1150, growTime: 240, waterUse: 8, color: 0x7FE9FF, level: 10, xp: 200, rp: 9 }
   },
 
   // Mutacoes: sorteadas ao plantar; a planta mutante brilha e rende itens especiais (mais valiosos).
   mutations: {
-    golden:  { name: 'Dourada',   chance: 0.070, mult: 2.5, yield: 1, color: 0xFFD166, level: 2 },
-    giant:   { name: 'Gigante',   chance: 0.060, mult: 1.5, yield: 2, color: 0x7ED957, level: 3 },
-    crystal: { name: 'Cristalina', chance: 0.035, mult: 4,  yield: 1, color: 0x59E6FF, level: 5 },
-    shadow:  { name: 'Sombria',   chance: 0.030, mult: 3.2, yield: 1, color: 0xB26BFF, level: 6 },
-    rainbow: { name: 'Arco-iris', chance: 0.012, mult: 9,   yield: 1, color: 0xFF6BE0, level: 8 }
+    pearly: { name: 'Perolada', chance: 0.047, mult: 2.8, yield: 1, color: 0xFFE7C4, level: 3, delay: .06 },
+    tidal: { name: 'Abissal', chance: 0.021, mult: 5, yield: 1, color: 0x18D6BA, level: 7, delay: .12 },
+    eclipse: { name: 'Eclipsada', chance: 0.008, mult: 10, yield: 1, color: 0xB689DE, level: 9, delay: .18 },
+    golden:  { name: 'Dourada',   chance: 0.070, mult: 2.5, yield: 1, color: 0xFFD166, level: 2, delay: .03 },
+    giant:   { name: 'Gigante',   chance: 0.060, mult: 1.5, yield: 2, color: 0x7ED957, level: 3, delay: .045 },
+    crystal: { name: 'Cristalina', chance: 0.035, mult: 4,  yield: 1, color: 0x59E6FF, level: 5, delay: .08 },
+    shadow:  { name: 'Sombria',   chance: 0.030, mult: 3.2, yield: 1, color: 0xB26BFF, level: 6, delay: .10 },
+    rainbow: { name: 'Arco-iris', chance: 0.012, mult: 9,   yield: 1, color: 0xFF6BE0, level: 8, delay: .15 }
   },
-  mutationOrder: ['rainbow', 'crystal', 'shadow', 'golden', 'giant'], // checadas da mais rara para a mais comum
+  mutationOrder: ['eclipse', 'rainbow', 'tidal', 'shadow', 'crystal', 'pearly', 'giant', 'golden'], // checadas da mais rara para a mais comum
 
   // Arvores frutiferas: plantadas em qualquer lugar livre; dao varios frutos repetidamente.
   treeOrder: ['apple', 'orange', 'peach', 'cherry', 'coconut', 'crystaltree', 'pear', 'starfruit'],
@@ -128,6 +134,9 @@ export const CONFIG = {
   },
 
   events: {
+    pollen: { name: 'Maré de pólen', kind:'climate', weight:2, level:3, duration:52, text:'Maré de pólen: novas sementes têm mais chance de mutação.' },
+    dew: { name: 'Orvalho de prata', kind:'climate', weight:2, level:2, duration:64, text:'Orvalho de prata: a água dos canteiros evapora pela metade.' },
+    solstice: { name: 'Solstício âmbar', kind:'climate', weight:1, level:5, duration:60, text:'Solstício âmbar: crescimento 20% mais rápido e geração de energia 15% maior.' },
     tempest: { name:'Temporal de monção',kind:'climate',weight:1,level:3,duration:48,text:'Frente de monção: nuvens baixas e chuva forte abastecem os reservatórios.' },
     aurora: { name:'Aurora de plasma',kind:'climate',weight:1,level:4,duration:60,text:'Aurora de plasma: a geração de energia aumenta em 45%.' },
     rain:    { name: 'Chuva',             kind: 'climate', weight: 3, level: 1, duration: 50, text: 'Chuva: agua extra e plantas crescem mais rapido.' },
@@ -182,6 +191,22 @@ export const CONFIG = {
   ],
 
   // get(state, reputacao) => valor atual; goal => meta
+  // Prestigio: reiniciar a fazenda rende Estrelas, gastas em melhorias permanentes.
+  prestige: {
+    minLevel: 12,
+    perks: [
+      { id: 'yield',  name: 'Colheita estelar',   desc: '+10% de colheita por nivel',            max: 10, base: 1, step: 1 },
+      { id: 'growth', name: 'Raizes aceleradas',  desc: '+6% de crescimento por nivel',          max: 10, base: 1, step: 1 },
+      { id: 'market', name: 'Barganha cosmica',   desc: '+5% no preco de venda por nivel',       max: 10, base: 1, step: 1 },
+      { id: 'mut',    name: 'Gene instavel',      desc: '+12% de chance de mutacao por nivel',   max: 5,  base: 2, step: 2 },
+      { id: 'xp',     name: 'Mente brilhante',    desc: '+10% de XP por nivel',                  max: 5,  base: 2, step: 1 },
+      { id: 'water',  name: 'Reservatorio eterno', desc: '+10 de capacidade de agua por nivel',  max: 5,  base: 2, step: 1 },
+      { id: 'energy', name: 'Folego infinito',    desc: '+15 de energia maxima por nivel',       max: 5,  base: 2, step: 1 },
+      { id: 'cash',   name: 'Heranca',            desc: 'Recomeca com +400 CR por nivel',        max: 5,  base: 1, step: 1 },
+      { id: 'start',  name: 'Atalho do veterano', desc: 'Recomeca 2 niveis acima por nivel',     max: 3,  base: 4, step: 3 }
+    ]
+  },
+
   achievements: [
     { id: 'h1',   name: 'Primeira colheita',   desc: 'Colha 1 planta',            goal: 1,    get: s => s.stats.harvested, reward: 20 },
     { id: 'h50',  name: 'Mao na terra',        desc: 'Colha 50 plantas',          goal: 50,   get: s => s.stats.harvested, reward: 100 },
@@ -210,3 +235,16 @@ export const CONFIG = {
     { id: 'ir3',  name: 'Fazenda automatica',  desc: 'Tenha 3 irrigadores',       goal: 3,    get: s => s.structures.filter(x => CONFIG_IRR.includes(x.type)).length, reward: 500 }
   ]
 };
+
+export function seedRarity(crop){
+  if(crop.prestige)return 'Lendária';
+  if(crop.level>=8)return 'Épica';
+  if(crop.level>=5)return 'Rara';
+  if(crop.level>=3)return 'Incomum';
+  return 'Comum';
+}
+// O progresso salvo continua medido de zero ao tempo base da espécie.
+export function growthCredit(plot, amount){
+  const delay=CONFIG.mutations[plot.mutation]?.delay || 0;
+  return amount/(1+delay);
+}

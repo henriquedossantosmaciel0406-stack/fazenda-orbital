@@ -580,6 +580,18 @@ export function createWorld(scene) {
   buildIsland(scene, world, rnd);
   buildGateAndBridge(scene, world);
 
+  // Altura da superficie (para pets e objetos nao afundarem): solo, praca, estrada, ilha
+  world.surfaceY = (x, z) => {
+    const isl = CONFIG.island;
+    if (world.islandUnlocked && Math.hypot(x - isl.x, z - isl.z) <= isl.radius) {
+      return Math.abs(x - (isl.x - 0.5)) < 13 && Math.abs(z - (isl.z + 9)) < 8 ? 0.26 : 0.12;
+    }
+    if (Math.abs(x + 32) < 20 && Math.abs(z + 24.5) < 22) return 0.2;
+    if (Math.abs(x - 30) < 24 && Math.abs(z - 25) < 21) return 0.16;
+    if (Math.abs(x) < 7 && Math.abs(z) < 118) return 0.08;
+    return 0;
+  };
+
   // --- Regras de movimento e zona ---
   const isl = CONFIG.island;
   world.isWalkable = (x, z) => {
