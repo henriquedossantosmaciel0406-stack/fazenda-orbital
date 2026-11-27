@@ -107,7 +107,7 @@ export function reputation() {
 export const perk = id => (state.prestige && state.prestige.upgrades[id]) || 0;
 export const cropUnlocked = c => state.level >= c.level && state.prestige.rank >= (c.prestige || 0);
 export const priceBonus = () => (1 + Math.min(0.4, reputation() / 400)) * (1 + 0.05 * perk('market') + 0.04 * perk('cash'));
-export const stockLimit = () => (dragonActive()?200:0) + 30*state.tools.satchel + 25*state.prestige.rank + CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
+export const stockLimit = () => (dragonActive()?200:0) + 20*perk('carga') + 30*state.tools.satchel + 25*state.prestige.rank + CONFIG.baseStockLimit + structuresOf('silo').reduce((a, s) => a + 80 * s.level, 0);
 export const maxEnergy = () => 20*state.tools.cell + CONFIG.baseMaxEnergy + 15 * perk('energy') + structuresOf('battery').reduce((a, s) => a + 60 * s.level, 0);
 export function stockUsed() {
   let n = 0;
@@ -153,7 +153,7 @@ export function addXp(amount) {
 export function addRP(n) {
   const lab = buildingLevel('lab');
   const mult = 1 + (lab ? 0.2 * (lab - 1) : 0);
-  state.rp += n * mult;
+  state.rp += n * mult * (1+.12*perk('esporos'));
 }
 
 // ---------- Objetivo atual ----------

@@ -91,6 +91,7 @@
 <div id="login" class="screen hidden">
   <div class="menu-card auth">
     <header class="colony-view"><h1>Fazenda Orbital</h1></header>
+    <select id="realmChoice" aria-label="Servidor da fazenda" hidden><option value="orbital">Servidor Orbital · original</option><option value="vega">Estação Vega · novo servidor</option></select>
     <div class="seg auth-tabs"><button id="tabLogin" type="button" class="active">Entrar</button><button id="tabRegister" type="button">Criar conta</button><button id="tabRecover" type="button" hidden>Recuperar</button></div>
     <form id="authForm" autocomplete="on">
       <label>Nick<input id="authNick" maxlength="16" autocomplete="username" spellcheck="false" placeholder="seu nick"/></label>
@@ -101,6 +102,7 @@
       <p id="authMsg" class="auth-msg"></p>
       <button id="authSubmit" type="submit">Entrar</button>
     </form>
+    <button id="copyOrbital" class="link" type="button" hidden>Copiar fazenda do Orbital para Vega</button>
     <button id="guestPlay" class="link" type="button" hidden>Jogar como visitante · salvo neste aparelho</button>
     <p id="authLocation" class="fine"></p>
   </div>

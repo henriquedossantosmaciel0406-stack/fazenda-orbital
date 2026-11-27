@@ -324,7 +324,7 @@ function waterTree(tree, byDrone) {
 
 function updateTrees(dt, t) {
   const gm = researchGrowth() * growthEventMult() * soilGrowth();
-  const pomo = hasResearch('pomology') ? 1.3 : 1;
+  const pomo = (hasResearch('pomology') ? 1.3 : 1)*(1+.12*perk('pomar'));
   for (let i = 0; i < trees.length; i++) {
     const inst = trees[i], d = inst.data, def = CONFIG.trees[d.type];
     d.water = Math.max(0, d.water - 0.03 * evaporationMult() * dt);

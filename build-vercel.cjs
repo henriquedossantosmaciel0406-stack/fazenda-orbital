@@ -13,3 +13,10 @@ for(const name of ['js','assets','style.css']){
 const page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8')
   .replace('<head>','<head><meta name="orbital-relay" content="/api/room">');
 fs.writeFileSync(path.join(out,'index.html'),page);
+
+if(process.env.VERCEL_ENV==='production'){
+  require('./server/vega.cjs').verifyStorage().then(()=>console.log('Estação Vega: leitura, gravação e controle de versão verificados.')).catch(error=>{
+    console.error('Teste do armazenamento privado de Vega:',error.name);
+    process.exitCode=1;
+  });
+}

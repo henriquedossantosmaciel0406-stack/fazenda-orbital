@@ -1,19 +1,19 @@
 import { CONFIG } from './config.js';
-import { state, save } from './state.js';
+import { state, save, perk } from './state.js';
 
 const drone = CONFIG.drone;
 export const modules = {
   battery: {
     name: 'Bateria', prices: [160, 300, 480, 720, 1050],
-    value: level => drone.cap + level * 20,
+    value: level => drone.cap + level * 20 + 12*perk('reserva'),
     format: value => value + ' de capacidade'
   },
   motor: {
     name: 'Propulsores', prices: [200, 350, 550, 800, 1150],
-    value: level => 1 + level * 0.15,
+    value: level => (1 + level * 0.15)*(1+.08*perk('rotor')),
     format: value => Math.round(value * 100) + '% da velocidade base'
   },
-  charger: {name:'Indutor de recarga',prices:[220,400,650], value:level=>1+level*.3,
+  charger: {name:'Indutor de recarga',prices:[220,400,650], value:level=>(1+level*.3)*(1+.15*perk('bobina')),
     format:value=>Math.round(value*100)+'% da taxa de recarga'},
   regulator: {name:'Regulador de consumo',prices:[250,480,750],value:level=>1-level*.12,
     format:value=>Math.round(value*100)+'% do consumo normal'},

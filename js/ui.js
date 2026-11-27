@@ -1,5 +1,5 @@
 import {setSprite} from './pixel-sprites.js';
-import {hosted,api,enterCloud,enterVisitor,visiting,settle} from './cloud.js';
+import {hosted,vega,api,enterCloud,enterVisitor,visiting,settle} from './cloud.js';
 import {saveKeyFor} from './accounts.js';
 import {PETS} from './actors.js';
 import {openDaily,openAlbum} from './retention.js';
@@ -637,6 +637,12 @@ export async function showLogin() {
   return new Promise(resolve=>{
     const box=$('login'),form=$('authForm'),msg=$('authMsg');
     let mode='login',busy=false;
+    const realm=$('realmChoice');
+    realm.hidden=!hosted;
+    realm.value=vega?'vega':'orbital';
+    realm.onchange=()=>{const url=new URL(location.href);url.searchParams.set('servidor',realm.value);url.searchParams.set('relogin','1');location.assign(url);};
+    const copy=$('copyOrbital');copy.hidden=!vega;
+    copy.onclick=()=>{if(!busy)setMode('copy');};
     const demo=$('guestPlay');
     demo.hidden=!hosted;
     demo.onclick=()=>{
@@ -647,32 +653,32 @@ export async function showLogin() {
       }
       enterVisitor();adminSession=false;box.classList.add('hidden');resolve({nick:nickname,visitor:true});
     };
-    $('authLocation').textContent=hosted?'Conta e fazenda ficam salvas neste servidor.':'Modo local. Contas e progresso ficam neste navegador.';
+    $('authLocation').textContent=vega?'Estação Vega · conta e progresso próprios. Para trazer sua fazenda, use Copiar do Orbital.':hosted?'Conta e fazenda ficam salvas neste servidor.':'Modo local. Contas e progresso ficam neste navegador.';
     $('tabRecover').hidden=!hosted;
     box.classList.remove('hidden');$('menu').classList.add('hidden');
     $('authNick').value=lastNick();$('authPass').value='';
     const setMode=m=>{
       mode=m;msg.textContent='';
       for(const [id,value] of [['tabLogin','login'],['tabRegister','register'],['tabRecover','recover']])$(id).classList.toggle('active',m===value);
-      $('authPass2Row').classList.toggle('hidden',m==='login');
+      $('authPass2Row').classList.toggle('hidden',m==='login'||m==='copy');
       $('recoverRow').classList.toggle('hidden',m!=='recover');
-      $('authPass').autocomplete=m==='login'?'current-password':'new-password';
+      $('authPass').autocomplete=m==='login'||m==='copy'?'current-password':'new-password';
       $('authPass').placeholder=m==='recover'?'nova senha':'sua senha';
-      $('authSubmit').textContent=m==='login'?'Entrar':m==='recover'?'Redefinir senha':'Criar conta e jogar';
+      $('authSubmit').textContent=m==='copy'?'Copiar fazenda com a senha do Orbital':m==='login'?'Entrar':m==='recover'?'Redefinir senha':'Criar conta e jogar';
     };
     $('tabLogin').onclick=()=>setMode('login');$('tabRegister').onclick=()=>setMode('register');$('tabRecover').onclick=()=>setMode('recover');setMode('login');
     form.onsubmit=async e=>{
       e.preventDefault();if(busy)return;
       const nick=$('authNick').value.trim(),pass=$('authPass').value;
-      if(mode!=='login'&&pass!==$('authPass2').value){msg.textContent='As senhas não conferem.';return;}
+      if(mode!=='login'&&mode!=='copy'&&pass!==$('authPass2').value){msg.textContent='As senhas não conferem.';return;}
       busy=true;$('authSubmit').disabled=true;msg.textContent='Verificando…';
       try{
         let r;
         if(hosted){
           const data={nick,pass,remember:remember(),code:$('recoverKey').value};
           const local=Object.hasOwn(JSON.parse(localStorage.getItem('fazenda-accounts-v1')||'{}'),nick.toLowerCase());
-          const migrating=local&&(mode==='register'||mode==='login')&&(await login(nick,pass)).ok;
-          if(mode==='register'&&local&&!migrating){msg.textContent='Para importar esta fazenda, use a senha da conta local.';return;}
+          const migrating=!vega&&local&&(mode==='register'||mode==='login')&&(await login(nick,pass)).ok;
+          if(!vega&&mode==='register'&&local&&!migrating){msg.textContent='Para importar esta fazenda, use a senha da conta local.';return;}
           const initialSave=migrating?JSON.parse(localStorage.getItem(saveKeyFor(nick))||'null'):null;
           if(mode==='register'&&initialSave)data.initialSave=initialSave;
           r=await api(mode,data);

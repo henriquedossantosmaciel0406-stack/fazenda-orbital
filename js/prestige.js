@@ -130,7 +130,10 @@ export function openPrestige() {
 const branches = [
   {name:'Cultivo', skills:['growth','yield','mut']},
   {name:'Engenharia', skills:['water','energy','xp']},
-  {name:'Comércio', skills:['cash','market','start']}
+  {name:'Comércio', skills:['cash','market','start']},
+  {name:'Botânica', requires:'growth', skills:['pomar','orvalho','esporos']},
+  {name:'Robótica', requires:'water', skills:['rotor','bobina','reserva']},
+  {name:'Logística', requires:'cash', skills:['carga','frete','prazo']}
 ];
 
 function skillLock(id){
@@ -138,7 +141,9 @@ function skillLock(id){
   const branch=branches.find(b=>b.skills.includes(id));
   if(!branch)return 'Habilidade desconhecida';
   const tier=branch.skills.indexOf(id);
-  if(state.prestige.rank<tier+1)return 'Requer prestígio '+(tier+1);
+  const rank=tier+(branch.requires?2:1);
+  if(state.prestige.rank<rank)return 'Requer prestígio '+rank;
+  if(tier===0 && branch.requires && !perk(branch.requires))return 'Requer '+P().perks.find(s=>s.id===branch.requires).name+' Nv. 1';
   if(tier && !perk(branch.skills[tier-1])){
     const previous=P().perks.find(p=>p.id===branch.skills[tier-1]);
     return 'Requer '+previous.name+' Nv. 1';
@@ -161,7 +166,16 @@ function drawSkills(box, selected, remember){
     action.onclick=()=>{if(buyPerk(id)){refreshModal();updateHUD();}};
     detail.replaceChildren(heading,el('span','grove-level','Nível '+lv+' / '+cap),el('p','',def.desc),action);
   }
-  for(const branch of branches){
+  const advanced=branches.some(b=>b.requires&&b.skills.includes(selected));
+  const switcher=el('div','tabs');
+  for(const [i,label] of ['Fundamentos','Especializações'].entries()){
+    const button=el('button','tab'+(advanced===!!i?' active':''),label);
+    button.type='button';button.setAttribute('aria-pressed',String(advanced===!!i));
+    button.onclick=()=>{remember(i?'pomar':'growth');refreshModal();};
+    switcher.append(button);
+  }
+  box.append(switcher);
+  for(const branch of branches.filter(b=>!!b.requires===advanced)){
     const lane=el('section','grove-lane');
     lane.append(el('h4','',branch.name));
     for(const id of branch.skills){

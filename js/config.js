@@ -203,6 +203,15 @@ export const CONFIG = {
   prestige: {
     minLevel: 12,
     perks: [
+      {id:'pomar',name:'Seiva lunar',desc:'Árvores maduras formam frutos 12% mais rápido por nível.',base:2,step:2,max:5},
+      {id:'orvalho',name:'Folha de orvalho',desc:'A umidade dura 15% mais tempo por nível em árvores e canteiros.',base:3,step:2,max:4},
+      {id:'esporos',name:'Microscópio de campo',desc:'Receba 12% mais pontos de pesquisa por nível nas atividades que geram PP.',base:4,step:2,max:4},
+      {id:'rotor',name:'Hélice orbital',desc:'Drones voam 8% mais rápido por nível.',base:2,step:2,max:5},
+      {id:'bobina',name:'Bobina de indução',desc:'Drones recarregam 15% mais rápido na base por nível.',base:3,step:2,max:5},
+      {id:'reserva',name:'Reserva de voo',desc:'Concede 12 unidades extras de bateria a cada drone por nível.',base:4,step:2,max:5},
+      {id:'carga',name:'Porão modular',desc:'Abre 20 espaços permanentes de estoque por nível.',base:2,step:1,max:5},
+      {id:'frete',name:'Frete expresso',desc:'Novos contratos normais e urgentes pagam 10% mais créditos por nível.',base:3,step:2,max:5},
+      {id:'prazo',name:'Carta de navegação',desc:'Novos contratos normais e urgentes ganham 30 segundos de prazo por nível.',base:4,step:2,max:4},
       { id: 'yield',  name: 'Colheita estelar',   desc: '+10% de colheita por nivel',            max: 10, base: 1, step: 1 },
       { id: 'growth', name: 'Raizes aceleradas',  desc: '+6% de crescimento por nivel',          max: 10, base: 1, step: 1 },
       { id: 'market', name: 'Barganha cosmica',   desc: '+5% no preco de venda por nivel',       max: 10, base: 1, step: 1 },

@@ -1,5 +1,5 @@
 // Missoes, contratos do Mercado e conquistas.
-import { state, bus, addMoney, addXp, addRP, reputation, setObjective } from './state.js';
+import { state, bus, perk, addMoney, addXp, addRP, reputation, setObjective } from './state.js';
 import { CONFIG } from './config.js';
 import { row, section, showToast, updateHUD, el } from './ui.js';
 import { play } from './audio.js';
@@ -73,10 +73,11 @@ export function contractTitle(c) {
 const maxActive = () => 3 + Math.min(3, Math.floor(reputation() / 60));
 
 function makeContract(t) {
-  const bonus = 1 + Math.min(0.5, reputation() / 300);
+  const bonus = (1 + Math.min(0.5, reputation() / 300))*(1+.1*perk('frete'));
+  const life=t.life+30*perk('prazo');
   return {
     id: state.contracts.nextId++, key: t.key, type: t.type, item: t.item, amount: t.amount, progress: 0,
-    reward: { ...t.reward, money: Math.round(t.reward.money * bonus) }, left: t.life, life: t.life, urgent: false
+    reward: { ...t.reward, money: Math.round(t.reward.money * bonus) }, left: life, life, urgent: false
   };
 }
 
@@ -100,10 +101,11 @@ export function createUrgent() {
   const key = eligible[Math.floor(Math.random() * eligible.length)];
   const crop = CONFIG.crops[key];
   const amount = Math.min(8, 3 + Math.floor(state.level / 2));
+  const life=150+30*perk('prazo');
   const c = {
     id: state.contracts.nextId++, key: 'urgent_' + state.contracts.nextId, type: 'deliver', item: key, amount, progress: 0,
-    reward: { money: Math.round(amount * crop.sellPrice * 2.4 + 150), xp: 60 + amount * 5, rp: 4 },
-    left: 150, life: 150, urgent: true
+    reward: { money: Math.round((amount * crop.sellPrice * 2.4 + 150)*(1+.1*perk('frete'))), xp: 60 + amount * 5, rp: 4 },
+    left: life, life, urgent: true
   };
   state.contracts.active.unshift(c);
   return c;
