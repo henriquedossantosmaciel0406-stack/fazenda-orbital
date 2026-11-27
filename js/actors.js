@@ -83,74 +83,111 @@ export const PETS={
   turtle:{name:'Tartaruga de musgo',cost:680,desc:'Enquanto acompanha você, cultivos e árvores crescem 20% mais rápido.'},
   axolotl:{name:'Axolote de orvalho',cost:840,desc:'Enquanto acompanha você, cada unidade de água da sua rega rende 30% mais.'}
 };
-const coats={cat:0x8D8FB5,dog:0xF0A860,rabbit:0xE6D4F0,fox:0xF07C4A,turtle:0x8FD08A,axolotl:0xFFB3C8};
-// Pets cartoon: cabecona, olhos grandes e brilhantes, bochechas coradas, patinhas curtas. Frente = +z, pe no y = 0.
-export function makePet(type){
-  const root=new THREE.Group(),body=pivot(root,0,0,0),core=pivot(body,0,0,0);
-  const low=type==='turtle'||type==='axolotl',bunny=type==='rabbit',fur=coats[type];
-  const blush=0xFF9AAE;
-  const head=pivot(body,0,low?.30:.52,low?.30:.22),tail=pivot(body,0,low?.26:.36,-.28),legs=[];
-  const cone=(g,c,x,y,z,w,h,d)=>piece(g,geo('cone',1,1,10),c,x,y,z,w,h,d);
-  // corpo e barriga
-  oval(core,fur,0,low?.24:.32,-.04,low?.27:.20,low?.17:.20,low?.34:.27);
-  if(!low) oval(core,cream,0,.27,.10,.14,.14,.15);
-  // cabeca grande + focinho
-  oval(head,fur,0,.08,0,low?.27:.255,low?.21:.23,low?.24:.22);
-  oval(head,low?0xFFE3EA:cream,0,.01,.15,low?.13:.115,.075,.09);
-  // rosto: olhos grandes, brilhos, bochechas, boca
-  eyes(head,.115,low?.19:.17,type==='axolotl'?.15:.105,.047);
-  for(const side of [-1,1]) oval(head,blush,side*(low?.2:.17),.03,low?.16:.145,.05,.03,.02);
-  oval(head,0x3A2433,0,.045,low?.235:.22,.034,.024,.024);
-  piece(head,geo('tor',.04,.007,4,10,Math.PI),0x6A3A44,0,.0,low?.235:.215).rotation.z=Math.PI;
-  if(type==='turtle'){
-    oval(core,0x4C9A6C,0,.40,-.07,.34,.25,.40);
-    for(let i=0;i<7;i++){const a=i*Math.PI/3.5;oval(core,i%2?0xB6E28A:0x7BC47F,.20*Math.cos(a),.55,-.07+.24*Math.sin(a),.11,.06,.12);}
-    oval(core,0xB6E28A,0,.60,-.07,.12,.07,.13);
-    for(const side of [-1,1]) oval(core,0xFFF3C4,side*.33,.34,-.07,.04,.10,.30); // borda clara do casco
-    for(const side of [-1,1]) oval(core,0x7BC47F,side*.04,.74,-.07,.04,.10,.025).rotation.z=-side*.5; // broto
-    cone(tail,fur,0,-.02,-.10,.06,.18,.06).rotation.x=-2.0;
-  }else if(type==='axolotl'){
-    for(const side of [-1,1])for(let i=0;i<3;i++){
-      const g=pivot(head,side*.21,.06+i*.065,-.02);g.rotation.z=-side*(1.30-i*.34);g.rotation.y=side*.2;
-      oval(g,0xE0527F,0,.10,0,.034,.14,.04);
-      for(const sg of [-1,1]) oval(g,0xFF8DB1,sg*.03,.16,0,.024,.06,.024).rotation.z=-sg*.6;
-    }
-    oval(tail,0xFF8DB1,0,.02,-.18,.05,.14,.26); // cauda-nadadeira
-    oval(body,0xFFE3EA,0,.21,.18,.20,.07,.12);   // sorriso largo (focinho)
-  }else{
-    for(const side of [-1,1]){
-      if(bunny){
-        const ear=pivot(head,side*.11,.21,-.02);ear.rotation.z=side<0?.20:1.0; // uma orelha caida
-        oval(ear,fur,0,.22,0,.075,.25,.06);oval(ear,0xF2A6BC,0,.23,.04,.04,.17,.02);
-      }else{
-        const big=type==='fox'?.29:type==='dog'?.24:.18;
-        const e=cone(head,fur,side*.16,.27,-.02,.115,big,.095);e.rotation.z=-side*.2;
-        cone(head,type==='fox'?0x40303A:0xF2A6BC,side*.163,.275,.03,.06,big*.6,.045).rotation.z=-side*.2;
-      }
-    }
-    if(type==='fox'){
-      oval(head,cream,0,.035,.16,.14,.07,.12);
-      for(const side of [-1,1]) oval(head,cream,side*.19,.0,.08,.07,.08,.12); // bochechas peludas
-      oval(tail,fur,0,.14,-.20,.14,.15,.30).rotation.x=.5;oval(tail,cream,0,.24,-.42,.10,.11,.15).rotation.x=.5;
-      piece(core,geo('tor',.17,.05,6,14),0x5DB7C9,0,.43,.13).rotation.x=1.2; // cachecol
-    }else if(type==='cat'){
-      for(let i=0;i<6;i++)oval(tail,i%2?0x565880:fur,.045*i,.05+i*.085,-.04-.06*Math.sin(i*.6),.064,.09,.064);
-      for(let i=-1;i<=1;i++)oval(head,0x575980,i*.06,.205,.14,.016,.05,.022);
-      for(const side of [-1,1])for(let k=0;k<2;k++) piece(head,geo('cyl',.004,.004,.18,3),0xFFFFFF,side*.2,.03-k*.03,.19).rotation.set(0,0,Math.PI/2+side*(k?.15:-.1)); // bigodes
-      piece(core,geo('tor',.15,.03,5,14),0xE0527F,0,.45,.14).rotation.x=1.25;oval(core,0xFFD166,0,.38,.27,.035,.035,.035); // coleira + guizo
-    }else if(bunny){
-      oval(tail,0xFFFFFF,0,.02,-.09,.12,.12,.12);
-    }else{ // corgi
-      oval(head,cream,0,.14,.12,.04,.10,.05);
-      oval(core,0x3F7FC6,0,.46,.12,.21,.07,.16);cone(core,0x3F7FC6,0,.38,.25,.10,.16,.04).rotation.x=Math.PI; // lenco
-      oval(tail,cream,0,.05,-.07,.095,.10,.12);
+const coats={cat:0x718298,dog:0xe3a05c,rabbit:0xcebedf,fox:0xd96c3b,turtle:0x8fbc89,axolotl:0xf7b8c5};
+// Seções transversais esculpem a silhueta ao longo do focinho, corpo ou cauda.
+// Cada anel contém [z, altura do centro, meia largura, meia altura].
+function profile(parent,color,rings,sides=10){
+  const vertices=[],indices=[];
+  for(const [z,y,w,h] of rings){
+    for(let i=0;i<sides;i++){
+      const a=2*Math.PI*i/sides;
+      vertices.push(w*Math.cos(a),y+h*Math.sin(a),z);
     }
   }
-  for(const x of [-1,1])for(const z of [-1,1]){
-    const leg=pivot(body,x*(low?.23:.12),low?.15:.22,z*.18-.03);
-    const stock=type==='fox'||type==='cat'&&z>0;
-    oval(leg,type==='fox'?0x40303A:fur,0,-.07,0,.07,.11,.075);
-    oval(leg,low?fur:(type==='fox'?0x40303A:cream),0,low?-.10:-.17,.025,bunny?.095:.078,.058,bunny&&z<0?.17:.10);
+  for(let j=0;j<rings.length-1;j++)for(let i=0;i<sides;i++){
+    const a=j*sides+i,b=j*sides+(i+1)%sides;
+    indices.push(a,b,a+sides,b,b+sides,a+sides);
+  }
+  const last=(rings.length-1)*sides;
+  for(let i=1;i<sides-1;i++)indices.push(0,i+1,i,last,last+i,last+i+1);
+  const geom=new THREE.BufferGeometry();
+  geom.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geom.setIndex(indices);geom.computeVertexNormals();
+  return piece(parent,geom,color,0,0,0);
+}
+const anatomies={
+  cat:{head:[0,.59,.24],tail:[0,.38,-.31],torso:[[-.37,.34,.08,.11],[-.21,.34,.20,.22],[.08,.42,.165,.21],[.23,.48,.14,.16]]},
+  dog:{head:[0,.49,.29],tail:[0,.35,-.40],torso:[[-.42,.32,.12,.12],[-.26,.32,.24,.20],[.17,.33,.22,.21],[.30,.39,.17,.19]]},
+  rabbit:{head:[0,.49,.25],tail:[0,.30,-.31],torso:[[-.34,.29,.11,.14],[-.19,.34,.28,.29],[.04,.34,.21,.24],[.20,.38,.14,.19]]},
+  fox:{head:[0,.55,.32],tail:[0,.34,-.36],torso:[[-.40,.34,.09,.12],[-.24,.37,.19,.19],[.05,.42,.15,.17],[.26,.47,.19,.22]]},
+  turtle:{head:[0,.24,.39],tail:[0,.19,-.39],torso:[[-.43,.22,.10,.08],[-.26,.23,.31,.15],[.12,.23,.32,.15],[.36,.22,.18,.10]]},
+  axolotl:{head:[0,.23,.32],tail:[0,.18,-.32],torso:[[-.38,.18,.06,.07],[-.15,.18,.15,.13],[.13,.19,.19,.14],[.33,.19,.16,.10]]}
+};
+export function makePet(type){
+  const root=new THREE.Group(),body=pivot(root,0,0,0),core=pivot(body,0,0,0);
+  const spec=anatomies[type],head=pivot(body,...spec.head),tail=pivot(body,...spec.tail);
+  const fur=coats[type],legs=[],low=type==='turtle'||type==='axolotl';
+  profile(core,fur,spec.torso);
+  const wide=type==='axolotl'?.33:type==='turtle'?.16:.24;
+  profile(head,fur,[[-.18,.09,wide*.45,.13],[-.08,.10,wide,.21],[.11,.085,wide*.96,low?.13:.18],[.21,.045,wide*.65,.10]]);
+  eyes(head,.13,.169,wide*.63,.037);
+  function ear(side,height,width,tilt){
+    const e=pivot(head,side*.145,.215,-.045);e.rotation.z=-side*tilt;
+    const cone=geo('cone',1,1,4);
+    piece(e,cone,fur,0,height*.43,0,width,height,.087);
+    piece(e,cone,0xbb838e,0,height*.40,.058,width*.57,height*.64,.035);
+  }
+  if(!low){
+    const muzzle=type==='fox'?.33:type==='dog'?.285:.225;
+    profile(head,cream,[[.14,.035,.14,.086],[.196,.026,.139,.078],[muzzle,.018,.047,.037]]);
+    oval(head,ink,0,.045,muzzle,.047,.031,.026);
+  }
+  if(type==='cat'){
+    for(const side of [-1,1]){
+      ear(side,.25,.12,.12);
+      for(let i=0;i<2;i++)oval(head,cream,side*.179,.04+i*.049,.155,.079,.012,.014).rotation.z=side*.20;
+    }
+    for(let i=0;i<3;i++)oval(head,ink,(i-1)*.064,.239,.109,.018,.063,.021);
+    const curl=profile(tail,fur,[[-.40,.39,.046,.053],[-.33,.49,.066,.068],[-.22,.42,.072,.08],[-.16,.19,.078,.10],[0,0,.079,.08]]);
+    curl.rotation.y=.32;
+  }else if(type==='dog'){
+    for(const side of [-1,1]){
+      ear(side,.33,.15,.34);
+      oval(head,cream,side*.127,.196,.143,.046,.025,.023);
+    }
+    oval(head,cream,0,.16,.162,.043,.10,.028);
+    oval(core,0x387980,0,.45,.21,.208,.059,.176);
+    piece(core,geo('cone',1,1,3),0x55a6a0,0,.34,.32,.109,.23,.044).rotation.x=Math.PI;
+    oval(tail,cream,0,.09,-.045,.125,.125,.10);
+  }else if(type==='rabbit'){
+    for(const side of [-1,1]){
+      const e=pivot(head,side*.115,.21,-.035);e.rotation.z=-side*(side<0?.23:1.16);
+      oval(e,fur,0,.25,0,.091,.30,.061);oval(e,0xe895af,0,.27,.043,.052,.21,.03);
+      oval(core,fur,side*.19,.27,-.17,.14,.225,.22);
+    }
+    oval(tail,cream,0,.055,-.04,.124,.138,.125);
+  }else if(type==='fox'){
+    for(const side of [-1,1]){
+      ear(side,.31,.118,.15);
+      piece(head,geo('cone',1,1,4),cream,side*.196,.044,.075,.09,.21,.10).rotation.z=side*2.16;
+    }
+    profile(tail,fur,[[-.49,.22,.127,.14],[-.31,.12,.195,.18],[-.14,.05,.131,.13],[0,0,.068,.08]]);
+    profile(tail,cream,[[-.69,.36,.015,.022],[-.57,.30,.089,.095],[-.49,.22,.127,.14]]);
+  }else if(type==='turtle'){
+    oval(core,0xc7c694,0,.26,-.04,.345,.105,.414);
+    profile(core,0x39796c,[[-.44,.31,.025,.03],[-.27,.38,.255,.17],[0,.42,.328,.231],[.20,.37,.27,.16],[.355,.30,.08,.04]]);
+    for(let i=0;i<5;i++){
+      const a=i*2.39996;
+      const plate=piece(core,geo('cyl',1,1,.048,6),i%2?0xa2bb70:0x7ea578,.16*Math.cos(a),.581,-.04+.19*Math.sin(a),.11,1,.125);
+      plate.rotation.z=-.33*Math.cos(a);plate.rotation.x=.34*Math.sin(a);
+    }
+    profile(tail,fur,[[-.22,-.041,.012,.017],[0,0,.093,.061]]);
+  }else{
+    for(const side of [-1,1])for(let i=0;i<3;i++){
+      const gill=pivot(head,side*.22,.052+i*.048,-.083+i*.015);gill.rotation.z=-side*(1.42-i*.38);
+      oval(gill,0xd86390,0,.13,0,.036,.163,.04);
+      for(let j=0;j<3;j++)for(const sign of [-1,1])
+        oval(gill,0xff95af,sign*.036,.095+.057*j,0,.022,.052,.024).rotation.z=-sign*.73;
+    }
+    profile(tail,0xf294ac,[[-.49,.056,.012,.03],[-.31,.089,.046,.11],[-.15,.057,.084,.163],[0,0,.10,.094]]);
+    for(let i=0;i<4;i++)oval(core,cream,0,.32-i*.014,.11-i*.093,.042,.018,.031);
+  }
+  for(const side of [-1,1])for(const end of [-1,1]){
+    const height=low?.15:type==='dog'?.19:.26;
+    const leg=pivot(body,side*(low?.204:.147),height,end*(type==='dog'?.248:.185)-.035);
+    const paw=type==='fox'?ink:low?fur:cream;
+    oval(leg,fur,low?side*.043:0,-height*.34,0,.065,height*.57,.076);
+    oval(leg,paw,low?side*.083:0,-height+.055,.041,type==='rabbit'?.095:.077,.058,type==='rabbit'&&end<0?.162:.097);
     batch(leg);legs.push(leg);
   }
   batch(core);batch(head);batch(tail);root.userData.pet={body,head,legs,tail,type};return root;
@@ -171,11 +208,11 @@ export function followPet(pet,owner,dt,t,world){
     const angle=Math.atan2(dir.x,dir.z);pet.rotation.y+=Math.atan2(Math.sin(angle-pet.rotation.y),Math.cos(angle-pet.rotation.y))*Math.min(1,dt*9);
   }
   p.y+=(gy(p.x,p.z)-p.y)*Math.min(1,dt*14); // acompanha o relevo: nunca afunda no solo, calcada ou estrada
-  const pace=Math.min(1,speed/2),step=Math.sin(t*12);
+  const pace=Math.min(1,speed/2),step=Math.sin(t*(data.type==='turtle'?6:12));
   data.body.position.y=Math.abs(step)*pace*(data.type==='rabbit'?0.18:0.046);
-  data.tail.rotation.z=Math.sin(t*(data.type==='dog'?11:3))*0.35;
+  data.tail.rotation.y=Math.sin(t*(data.type==='dog'?11:3))*(data.type==='turtle'?.09:.31);
   data.head.rotation.x=Math.sin(t*2)*0.065;
-  data.legs.forEach((leg,i)=>{leg.rotation.x=(i===1||i===2?-1:1)*step*pace*0.60;});
+  data.legs.forEach((leg,i)=>{const phase=data.type==='rabbit'?(i%2?1:-1):(i===1||i===2?-1:1);leg.rotation.x=phase*step*pace*.60;});
 }
 
 export function companion(scene) {

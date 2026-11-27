@@ -76,7 +76,7 @@ export async function ascend() {
 }
 
 export function openPrestige() {
-  let confirming = false;
+  let confirming = false, selectedSkill='growth';
   openModal({
     id: 'prestige', title: 'Prestígio', wide: true, hint: 'Pressione ESC para voltar',
     build(body) {
@@ -96,7 +96,7 @@ export function openPrestige() {
         }));
         box.append(list);
       } else if (index === 1) {
-        drawSkills(box);
+        drawSkills(box,selectedSkill,id=>{selectedSkill=id;});
       } else {
         box.append(el('p', 'hint', 'Os três primeiros prestígios liberam sementes, suprimentos e habilidades. Do quarto em diante, cada ascensão abre mais um nível em cada habilidade e reforça os suprimentos.'));
         const list = el('div', 'list');
@@ -141,25 +141,35 @@ function skillLock(id){
   return '';
 }
 
-function drawSkills(box){
-  box.append(el('p','hint','Cada ramo começa no topo. Aprenda a habilidade anterior para avançar.'));
-  const tree=el('div','skill-tree');box.append(tree);
-  for(const branch of branches){
-    const lane=el('section','skill-lane');tree.append(lane);
-    lane.append(section(branch.name));
-    for(const id of branch.skills){
-      const def=P().perks.find(p=>p.id===id),level=perk(id);
-      const lock=skillLock(id),cost=perkCost(def,level),maxed=level>=perkLimit(def);
-      const node=el('article','skill-node'+(level?' learned':''));
-      const img=el('img');img.src='assets/skills/'+id+'.png';img.alt='';
-      const title=el('h5','',def.name);
-      node.append(img,title,el('small','','Nv. '+level+' / '+perkLimit(def)),el('p','',def.desc));
-      const button=el('button','',maxed?'Completa':lock || 'Aprender · '+cost+' ★');
-      button.type='button';button.disabled=!!lock||maxed||state.prestige.stars<cost;
-      button.onclick=()=>{if(buyPerk(id)){refreshModal();updateHUD();}};
-      node.append(button);lane.append(node);
-    }
+function drawSkills(box, selected, remember){
+  const map=el('div','grove-map'),detail=el('section','grove-detail');
+  detail.setAttribute('aria-live','polite');
+  const nodes=new Map();
+  function select(id){
+    remember(id);
+    const def=P().perks.find(skill=>skill.id===id),lv=perk(id),cap=perkLimit(def);
+    const cost=perkCost(def,lv),locked=skillLock(id);
+    for(const [key,button] of nodes)button.setAttribute('aria-pressed',String(key===id));
+    const heading=el('h4','',def.name);
+    const action=el('button','grove-learn',lv>=cap?'Completa':locked || 'Aprender · '+cost+' ★');
+    action.type='button';action.disabled=lv>=cap||!!locked||state.prestige.stars<cost;
+    action.onclick=()=>{if(buyPerk(id)){refreshModal();updateHUD();}};
+    detail.replaceChildren(heading,el('span','grove-level','Nível '+lv+' / '+cap),el('p','',def.desc),action);
   }
+  for(const branch of branches){
+    const lane=el('section','grove-lane');
+    lane.append(el('h4','',branch.name));
+    for(const id of branch.skills){
+      const def=P().perks.find(skill=>skill.id===id);
+      const button=el('button','grove-rune'+(perk(id)?' learned':skillLock(id)?' locked':' available'));
+      button.type='button';button.setAttribute('aria-label',def.name+', nível '+perk(id));
+      const img=el('img');img.src='assets/skills/'+id+'.png';img.alt='';
+      button.append(img,el('span','',String(perk(id))));
+      button.onclick=()=>select(id);lane.append(button);nodes.set(id,button);
+    }
+    map.append(lane);
+  }
+  box.append(map,detail);select(selected);
 }
 
 const supplies=[

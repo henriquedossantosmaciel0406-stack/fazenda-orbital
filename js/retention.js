@@ -52,7 +52,7 @@ export function rewardFor(streak) {
 
 function rewardText(r) {
   const p = [r.money + ' CR'];
-  if (r.crystals) p.push(r.crystals + ' cristal' + (r.crystals > 1 ? 'is' : ''));
+  if (r.crystals) p.push(r.crystals + (r.crystals > 1 ? ' cristais' : ' cristal'));
   if (r.seeds) for (const k in r.seeds) p.push(r.seeds[k] + ' semente' + (r.seeds[k] > 1 ? 's' : '') + ' de ' + CONFIG.crops[k].name);
   return p.join(' + ');
 }
@@ -91,13 +91,16 @@ function recoverStreak() {
 export function openDaily() {
   const back = () => (state.mode === 'play' ? openPauseMenu() : closeModal(false));
   openModal({
-    id: 'daily', title: 'Recompensa diaria', wide: true, hint: 'Pressione ESC para voltar',
+    id: 'daily', title: 'Recompensa diária', wide: true, hint: 'Pressione ESC para voltar',
     build(body) {
       const d = state.daily, st = dailyStatus();
       const shown = st.kind === 'missed' ? 0 : d.streak;
-      body.append(el('p', 'hint', st.kind === 'missed'
-        ? 'Voce perdeu a sequencia de ' + d.streak + ' dias. Melhor marca: ' + d.best + ' dias.'
-        : 'Sequencia atual: ' + d.streak + ' dias. Melhor marca: ' + d.best + ' dias.'));
+      const banner=el('header','daily-sky');
+      const day=st.kind==='claimed'?d.streak:st.next;
+      banner.append(el('strong','',st.kind==='claimed'?'Resgate concluído':'Dia '+day),
+        el('span','',st.kind==='missed'?'Sequência interrompida · Recorde de '+d.best+' dias':
+        'Sequência de '+d.streak+' dias · Recorde de '+d.best));
+      body.append(banner);
 
       // trilha de 7 dias
       const track = el('div', 'daily-track');
@@ -107,10 +110,14 @@ export function openDaily() {
         const n = base + i, r = rewardFor(n);
         const done = n <= shown;
         const cell = el('div', 'daily-day' + (done ? ' done' : '') + (n === st.next && st.kind !== 'claimed' ? ' next' : '') + (r.big ? ' big' : ''));
-        cell.append(el('b', null, 'Dia ' + i), el('span', null, r.money + ' CR'));
-        if (r.crystals) cell.append(el('span', 'extra', r.crystals + ' cristal' + (r.crystals > 1 ? 'is' : '')));
+        const sprite=el('img','daily-sprite');
+        sprite.src=r.crystals?'assets/items/crystal.png':r.seeds?'assets/items/lettuce.png':'assets/skills/cash.png';
+        sprite.alt='';
+        cell.append(el('b', null, 'Dia ' + n),sprite, el('strong',null,r.money+' CR'));
+        if (r.crystals) cell.append(el('span', 'extra', r.crystals + (r.crystals > 1 ? ' cristais' : ' cristal')));
         if (r.seeds) cell.append(el('span', 'extra', 'sementes'));
-        if (done) cell.append(el('i', null, 'OK'));
+        if (done) cell.append(el('i', null, 'Resgatado'));
+        else if(st.kind!=='claimed' && n===st.next)cell.append(el('i',null,'Hoje'));
         track.append(cell);
       }
       body.append(track);
@@ -126,17 +133,17 @@ export function openDaily() {
         const canFix = d.streak >= 2 && st.missed <= MAX_RECOVER_DAYS;
         const cost = recoverCost(d.streak);
         if (canFix) list.append(row({
-          title: 'Recuperar sequencia', desc: 'Salva seus ' + d.streak + ' dias por ' + cost + ' CR. Disponivel por ' + MAX_RECOVER_DAYS + ' dias perdidos (voce perdeu ' + st.missed + ').',
+          title: 'Recuperar sequência', desc: 'Salva seus ' + d.streak + ' dias por ' + cost + ' CR. Disponivel por ' + MAX_RECOVER_DAYS + ' dias perdidos (voce perdeu ' + st.missed + ').',
           tag: cost + ' CR', buttons: [{ label: 'Recuperar', disabled: state.money < cost, onClick: () => { recoverStreak(); } }]
         }));
         list.append(row({
-          title: 'Recomecar do dia 1', desc: 'Resgata ' + rewardText(rewardFor(1)) + ' e inicia uma nova sequencia.',
+          title: 'Recomeçar do dia 1', desc: 'Resgata ' + rewardText(rewardFor(1)) + ' e inicia uma nova sequencia.',
           buttons: [{ label: 'Resgatar', onClick: () => { claimDaily(); updateHUD(); } }]
         }));
       } else {
         list.append(row({
           title: 'Recompensa de hoje resgatada', done: true, tag: 'FEITO', tagCls: 'good',
-          desc: 'Volte amanha para o dia ' + st.next + ': ' + rewardText(rewardFor(st.next))
+          desc: 'Volte amanhã para o dia ' + st.next + ': ' + rewardText(rewardFor(st.next))
         }));
       }
       body.append(list);
