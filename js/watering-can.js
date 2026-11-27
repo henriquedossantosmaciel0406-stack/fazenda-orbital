@@ -1,6 +1,7 @@
 import {CANS,canLevel} from './gear.js';
 import {state} from './state.js';
 import * as THREE from 'three';
+import {mergeGroupStatic} from './optimize.js';
 import { mat,geo } from './world.js';
 
 // Regador em primeira pessoa. O ponto na ponta do bico origina o jato.
@@ -59,6 +60,9 @@ export function createWateringCan(camera) {
   }
   segment(shell,[.614,.16,.044],[.568,.232,-.019],.048);
   segment(shell,[.568,.232,-.019],[.494,.247,-.002],.043);
+  segment(shell,[.588,.16,.073],[.551,.235,.018],.046);
+  segment(shell,[.551,.235,.018],[.486,.226,-.015],.038);
+  mergeGroupStatic(glove);
   hand.add(glove);
   let elapsed=1,raised=0; const tip=new THREE.Vector3();
   return {
