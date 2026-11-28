@@ -95,6 +95,23 @@ const builders = {
     add(g, M(geo('sph', 0.25, 8, 6), emis(0x4FC3F7, 1)), 0, 3.4, 0);
     u.height = 3.6;
   },
+  solarPanel(g,u) {
+    const steel=mat(0x637b94),trim=mat(0xf1b759),rim=mat(0xb1cbcd);
+    add(g,M(geo('cyl',.68,.84,.31,8),steel),0,.16,0);
+    add(g,M(geo('cyl',.21,.31,1.32,8),rim),0,.95,0);
+    add(g,M(geo('cyl',.37,.37,.52,10),trim),0,1.51,0).rotation.z=Math.PI/2;
+    const rack=new THREE.Group();rack.position.y=1.64;rack.rotation.x=.47;g.add(rack);
+    add(rack,M(geo('box',3.4,.13,2.1),rim));
+    const cells=[mat(0x24538b),mat(0x3779a8),mat(0x325e9a)];
+    for(let row=0;row<3;row++)for(let col=0;col<5;col++){
+      const x=(col-2)*.65,z=(row-1)*.65;
+      add(rack,M(geo('box',.61,.045,.61),cells[(row+col)%3]),x,.083,z);
+      add(rack,M(geo('box',.53,.016,.021),rim),x,.112,z,false);
+    }
+    add(rack,M(geo('box',.75,.22,.24),steel),0,-.04,1.07);
+    add(rack,M(geo('box',.36,.06,.02),trim),0,-.04,1.2,false);
+    u.height=2.3;
+  },
   battery(g, u) {
     add(g, M(geo('cyl', 1.1, 1.25, 0.35, 12), mat(0x4C6E8C)), 0, 0.18, 0);
     add(g, M(geo('cyl', 0.95, 0.95, 2.3, 14), mat(0x2E3A4D)), 0, 1.5, 0);

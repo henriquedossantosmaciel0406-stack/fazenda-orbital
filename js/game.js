@@ -32,8 +32,8 @@ import {
 import { initDrones, updateDrones, buyDrone, droneCost, openDronePanel } from './drones.js';
 
 // ---------- Constantes locais ----------
-const COUNT_MAX = { rain: 4, battery: 3, silo: 3, lab: 1, factory: 1, tower: 1, reactor: 2, station: 1, sprinkler: 6, drip: 6, rotary: 4, cloud: 2 };
-const UPG_MAX = { rain: 3, battery: 3, silo: 3, lab: 3, factory: 3, tower: 2, reactor: 3, station: 2, sprinkler: 3, drip: 3, rotary: 3, cloud: 3 };
+const COUNT_MAX = { solarPanel: CONFIG.structures.solarPanel.max, rain: 4, battery: 3, silo: 3, lab: 1, factory: 1, tower: 1, reactor: 2, station: 1, sprinkler: 6, drip: 6, rotary: 4, cloud: 2 };
+const UPG_MAX = { solarPanel: 3, rain: 3, battery: 3, silo: 3, lab: 3, factory: 3, tower: 2, reactor: 3, station: 2, sprinkler: 3, drip: 3, rotary: 3, cloud: 3 };
 const NIGHT = new THREE.Color(0x2B2E5A), DAYC = new THREE.Color(0x7CD0FF);
 const SOIL_COL = { farm: 0x6B4429, island: 0x4A3A78, tower: 0x5A5F6A };
 const BORDER_COL = { farm: 0xB98A5C, island: 0x7E6BD0, tower: 0x4FE3C1 };
@@ -45,7 +45,7 @@ let plotGroup;
 const instances = []; // estruturas colocadas: { data, group, def, build, timer }
 const trees = [];     // arvores: { data, group, mesh, stageKey, dirty }
 let irrigators = [];
-const fx = { rain: 0, reactor: 0 };
+const fx = { rain: 0, reactor: 0, solarPeak: 0 };
 let build = null; // modo construcao { type | tree, x, z, reason }
 let wateringCan, myPet;
 const ghosts = {}, treeGhosts = {};
@@ -418,9 +418,10 @@ const upgradeCost = s => Math.round(CONFIG.structures[s.type].cost * 0.8 * s.lev
 const upgradeCrystals = s => (CONFIG.structures[s.type].crystals ? Math.ceil(CONFIG.structures[s.type].crystals * 0.5 * s.level) : 0);
 
 function recomputeEffects() {
-  fx.rain = 0; fx.reactor = 0;
+  fx.rain = 0; fx.reactor = 0; fx.solarPeak = 0;
   for (const s of state.structures) {
     if (s.type === 'rain') fx.rain += 0.12 * s.level;
+    if (s.type === 'solarPanel') fx.solarPeak += CONFIG.structures.solarPanel.peak(s.level);
     if (s.type === 'reactor') fx.reactor += 1.2 * s.level;
   }
   irrigators = instances.filter(i => i.def.irrigator);
@@ -1162,7 +1163,8 @@ function updateResources(dt, day) {
   const gain = fx.rain + rainWaterGain()*(1+.2*perk('pluvio')) + (day===0?.05*perk('sereno'):0);
   if (gain > 0 && state.water < cap) state.water = Math.min(cap, state.water + gain * dt);
   if (state.water > cap) state.water = Math.max(cap, state.water - dt * 0.5);
-  const gen = (0.2 + 0.5 * day*(1+.15*perk('foton'))) * researchEnergy() * energyEventMult() + fx.reactor;
+  const panelPower = fx.solarPeak * day * Math.min(1, weatherVisual.light);
+  const gen = (0.2 + panelPower + 0.5 * day*(1+.15*perk('foton'))) * researchEnergy() * energyEventMult() + fx.reactor;
   const me = maxEnergy();
   state.energy = Math.min(me, state.energy + gen * dt);
   if (state.energy > me) state.energy = me;

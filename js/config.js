@@ -110,6 +110,9 @@ export const CONFIG = {
   // Construcoes (kind building) e decoracoes (kind decor). island:true => so na Ilha Cristalina.
   structures: {
     rain:    { kind: 'building', name: 'Coletor de chuva',   cost: 250,  level: 2, max: 3, radius: 1.8, rep: 2,  desc: 'Gera agua lentamente para o regador.', effect: l => '+' + (0.12 * l).toFixed(2) + ' agua por segundo' },
+    solarPanel: { kind:'building', name:'Painel solar orbital', cost:500, level:3, max:3, radius:2.2, rep:2,
+      peak:level=>5*level, desc:'Recarrega a energia da fazenda com luz do dia. A pesquisa solar dobra a produção.',
+      effect(level){return '+'+this.peak(level)+' energia/s ao meio-dia com céu aberto';} },
     battery: { kind: 'building', name: 'Bateria',            cost: 300,  level: 3, max: 3, radius: 1.6, rep: 2,  desc: 'Armazena mais energia para os drones.', effect: l => '+' + (60 * l) + ' energia maxima' },
     silo:    { kind: 'building', name: 'Silo',               cost: 400,  level: 3, max: 3, radius: 2.4, rep: 3,  desc: 'Aumenta o limite de estoque.', effect: l => '+' + (80 * l) + ' de estoque' },
     lab:     { kind: 'building', name: 'Laboratorio',        cost: 600,  level: 4, max: 1, radius: 3.0, rep: 5,  desc: 'Permite pesquisar tecnologias.', effect: l => 'Pesquisa liberada, +' + (0.04 * l).toFixed(2) + ' PP/s, PP ganhos +' + (20 * (l - 1)) + '%' },
