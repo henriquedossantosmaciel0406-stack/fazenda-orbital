@@ -1,10 +1,10 @@
+import {serviceRequest} from './service-pool.js';
 import {motionLinks} from './motion-link.js';
 // O transporte HTTP usa a mesma origem do jogo. Uma queda curta repete o mesmo
 // lote com o mesmo número, inclusive quando o servidor já confirmou um presente.
 export async function connectHttpRoom(op,code,handlers){
-  const endpoint='/api/room';
   async function request(data,closing=false){
-    const response=await fetch(endpoint,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,...data}),keepalive:closing,signal:AbortSignal.timeout(10000)});
+    const response=await serviceRequest('room',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,...data}),keepalive:closing},{replay:data.op==='poll'||closing,timeout:4500});
     const body=await response.json();
     if(!response.ok||!body.ok)throw Object.assign(new Error(body.error||'Falha no servidor de salas.'),{status:response.status});
     return body;
@@ -29,6 +29,7 @@ export async function connectHttpRoom(op,code,handlers){
       if(alone)return;
       if(motion.send(m))return;
     }
+    if(motion.sendRoom(packet))return;
     if(['pos','sync','farm'].includes(m.t)){
       const i=queue.findIndex(p=>p.to===packet.to&&p.except===packet.except&&p.msg.t===m.t&&p.msg.id===m.id);
       if(i!==-1)queue.splice(i,1);
@@ -68,10 +69,15 @@ export async function connectHttpRoom(op,code,handlers){
         handlers.onMsg(pose.from,pose.msg);
       }
       const urgent=queue.some(p=>!['farm','sync'].includes(p.msg.t));
-      const idleDelay=alone?2400:motion.ready()?2400:performance.now()<movingUntil?180:420;
+      const idleDelay=alone?4500:motion.ready()?3200:performance.now()<movingUntil?180:420;
       delay=reply.events.length>=64||(!alone&&urgent)?12:idleDelay;
     }catch(e){
       if(!active)return;
+      if(motion.roomReady()&&(!e.status||e.status===410||e.status===429||e.status>=500)){
+        // O grupo já admitido continua pelo canal direto durante a queda.
+        // O mesmo lote pendente pode ser confirmado pelo relay quando ele voltar.
+        retrying=true;delay=10000;return;
+      }
       if((e.status>=400&&e.status<500&&e.status!==429)||++failures>=15){
         close();handlers.onGone();return;
       }

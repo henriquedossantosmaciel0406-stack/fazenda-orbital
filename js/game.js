@@ -1155,10 +1155,10 @@ function bindInteraction() {
 // ======================================================================
 function updateResources(dt, day) {
   const cap = waterCap();
-  const gain = fx.rain + rainWaterGain();
+  const gain = fx.rain + rainWaterGain()*(1+.2*perk('pluvio')) + (day===0?.05*perk('sereno'):0);
   if (gain > 0 && state.water < cap) state.water = Math.min(cap, state.water + gain * dt);
   if (state.water > cap) state.water = Math.max(cap, state.water - dt * 0.5);
-  const gen = (0.2 + 0.5 * day) * researchEnergy() * energyEventMult() + fx.reactor;
+  const gen = (0.2 + 0.5 * day*(1+.15*perk('foton'))) * researchEnergy() * energyEventMult() + fx.reactor;
   const me = maxEnergy();
   state.energy = Math.min(me, state.energy + gen * dt);
   if (state.energy > me) state.energy = me;

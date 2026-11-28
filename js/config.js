@@ -203,6 +203,15 @@ export const CONFIG = {
   prestige: {
     minLevel: 12,
     perks: [
+      {id:'sereno',name:'Malha de sereno',desc:'À noite, o tanque recebe 0,05 unidade de água por segundo por nível.',icon:'assets/items/pond.png',base:4,step:2,max:4},
+      {id:'pluvio',name:'Calha de tempestade',desc:'Cada nível recolhe 20% mais água da chuva para o tanque.',icon:'assets/items/rain.png',base:5,step:2,max:4},
+      {id:'foton',name:'Célula de meio-dia',desc:'Cada nível aumenta em 15% a parcela de energia gerada pela luz do dia.',icon:'assets/items/cell.png',base:6,step:2,max:4},
+      {id:'bancada',name:'Bancada de ensaio',desc:'O laboratório produz 20% mais PP por nível enquanto a fazenda está ativa.',icon:'assets/items/lab.png',base:4,step:2,max:4},
+      {id:'amostras',name:'Lâmina de campo',desc:'Colher um canteiro à mão rende 1 PP extra por nível.',icon:'assets/items/lens.png',base:5,step:2,max:4},
+      {id:'genoma',name:'Arquivo de mutações',desc:'Colher um canteiro mutante rende 3 PP extras por nível, inclusive com drones.',icon:'assets/items/prism.png',base:6,step:2,max:4},
+      {id:'radio',name:'Rádio de carga',desc:'A contagem até a próxima oferta de contrato avança 12% mais rápido por nível.',icon:'assets/items/station.png',base:4,step:2,max:4},
+      {id:'laudo',name:'Laudo de entrega',desc:'Novos pedidos urgentes oferecem mais 2 PP por nível.',icon:'assets/items/satchel.png',base:5,step:2,max:4},
+      {id:'aduana',name:'Selo prismático',desc:'Cada novo pedido urgente inclui 1 cristal adicional por nível na recompensa.',icon:'assets/items/crystal.png',base:6,step:2,max:4},
       {id:'pomar',name:'Seiva lunar',desc:'Árvores maduras formam frutos 12% mais rápido por nível.',base:2,step:2,max:5},
       {id:'orvalho',name:'Folha de orvalho',desc:'A umidade dura 15% mais tempo por nível em árvores e canteiros.',base:3,step:2,max:4},
       {id:'esporos',name:'Microscópio de campo',desc:'Receba 12% mais pontos de pesquisa por nível nas atividades que geram PP.',base:4,step:2,max:4},

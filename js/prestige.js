@@ -133,7 +133,10 @@ const branches = [
   {name:'Comércio', skills:['cash','market','start']},
   {name:'Botânica', requires:'growth', skills:['pomar','orvalho','esporos']},
   {name:'Robótica', requires:'water', skills:['rotor','bobina','reserva']},
-  {name:'Logística', requires:'cash', skills:['carga','frete','prazo']}
+  {name:'Logística', requires:'cash', skills:['carga','frete','prazo']},
+  {name:'Clima', page:2, rank:4, requires:'orvalho', skills:['sereno','pluvio','foton']},
+  {name:'Pesquisa', page:2, rank:4, requires:'esporos', skills:['bancada','amostras','genoma']},
+  {name:'Expedição', page:2, rank:4, requires:'frete', skills:['radio','laudo','aduana']}
 ];
 
 function skillLock(id){
@@ -141,7 +144,7 @@ function skillLock(id){
   const branch=branches.find(b=>b.skills.includes(id));
   if(!branch)return 'Habilidade desconhecida';
   const tier=branch.skills.indexOf(id);
-  const rank=tier+(branch.requires?2:1);
+  const rank=tier+(branch.rank||(branch.requires?2:1));
   if(state.prestige.rank<rank)return 'Requer prestígio '+rank;
   if(tier===0 && branch.requires && !perk(branch.requires))return 'Requer '+P().perks.find(s=>s.id===branch.requires).name+' Nv. 1';
   if(tier && !perk(branch.skills[tier-1])){
@@ -166,23 +169,24 @@ function drawSkills(box, selected, remember){
     action.onclick=()=>{if(buyPerk(id)){refreshModal();updateHUD();}};
     detail.replaceChildren(heading,el('span','grove-level','Nível '+lv+' / '+cap),el('p','',def.desc),action);
   }
-  const advanced=branches.some(b=>b.requires&&b.skills.includes(selected));
+  const pageOf=b=>b.page??(b.requires?1:0);
+  const page=pageOf(branches.find(b=>b.skills.includes(selected)));
   const switcher=el('div','tabs');
-  for(const [i,label] of ['Fundamentos','Especializações'].entries()){
-    const button=el('button','tab'+(advanced===!!i?' active':''),label);
-    button.type='button';button.setAttribute('aria-pressed',String(advanced===!!i));
-    button.onclick=()=>{remember(i?'pomar':'growth');refreshModal();};
+  for(const [i,label] of ['Fundamentos','Especializações','Maestrias'].entries()){
+    const button=el('button','tab'+(page===i?' active':''),label);
+    button.type='button';button.setAttribute('aria-pressed',String(page===i));
+    button.onclick=()=>{remember(branches.find(b=>pageOf(b)===i).skills[0]);refreshModal();};
     switcher.append(button);
   }
   box.append(switcher);
-  for(const branch of branches.filter(b=>!!b.requires===advanced)){
+  for(const branch of branches.filter(b=>pageOf(b)===page)){
     const lane=el('section','grove-lane');
     lane.append(el('h4','',branch.name));
     for(const id of branch.skills){
       const def=P().perks.find(skill=>skill.id===id);
       const button=el('button','grove-rune'+(perk(id)?' learned':skillLock(id)?' locked':' available'));
       button.type='button';button.setAttribute('aria-label',def.name+', nível '+perk(id));
-      const img=el('img');setSprite(img,'assets/skills/'+id+'.png');img.alt='';
+      const img=el('img');setSprite(img,def.icon||'assets/skills/'+id+'.png');img.alt='';
       button.append(img,el('span','',String(perk(id))));
       button.onclick=()=>select(id);lane.append(button);nodes.set(id,button);
     }

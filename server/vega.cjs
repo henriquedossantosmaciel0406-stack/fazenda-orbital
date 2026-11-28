@@ -3,7 +3,7 @@ const {hash,fail}=require('./store.cjs');
 const {randomUUID}=require('node:crypto');
 const etag=Symbol('etag');
 const options={access:'private',addRandomSuffix:false};
-const objectKey=nick=>'vega/v1/players/'+hash(nick.toLowerCase())+'.json';
+const objectKey=(prefix,nick)=>prefix+'/v1/players/'+hash(nick.toLowerCase())+'.json';
 const collision=()=>Object.assign(fail(409,'A conta mudou em outro aparelho. Tente de novo.'),{retryable:true});
 
 async function fetchObject(path){
@@ -12,10 +12,10 @@ async function fetchObject(path){
   try{result=await get(path,{access:'private',useCache:false});}
   catch(error){if(error instanceof BlobNotFoundError)return null;throw error;}
   if(!result)return null;
-  if(result.statusCode!==200||!result.stream)throw fail(503,'Vega não conseguiu ler o progresso.');
+  if(result.statusCode!==200||!result.stream)throw fail(503,'O servidor não conseguiu ler o progresso.');
   const value=await new Response(result.stream).json();
   value[etag]=result.blob?.etag||result.headers?.get?.('etag');
-  if(!value[etag])throw fail(503,'Não foi possível conferir a versão do progresso em Vega.');
+  if(!value[etag])throw fail(503,'Não foi possível conferir a versão do progresso.');
   return value;
 }
 async function putObject(path,value){
@@ -30,10 +30,14 @@ async function putObject(path,value){
     throw error;
   }
 }
-const read=nick=>fetchObject(objectKey(nick));
-async function write(account){
-  account.stamp=randomUUID();
-  await putObject(objectKey(account.nick),account);
+function accountsAt(prefix){
+  return {
+    read:nick=>fetchObject(objectKey(prefix,nick)),
+    async write(account){
+      account.stamp=randomUUID();
+      await putObject(objectKey(prefix,account.nick),account);
+    }
+  };
 }
 async function limit(address){
   const path='vega/v1/rate/'+hash(address)+'.json';
@@ -46,7 +50,7 @@ async function limit(address){
   }
   throw fail(429,'Muitas tentativas simultâneas. Tente em instantes.');
 }
-module.exports={read,write,limit};
+module.exports={archive:accountsAt('vega'),primary:accountsAt('orbital'),limit};
 
 async function verifyStorage(){
   const {del}=await import('@vercel/blob');

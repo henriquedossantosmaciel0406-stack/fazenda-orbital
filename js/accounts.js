@@ -1,4 +1,4 @@
-import {vega} from './cloud.js';
+import {archiveProfile} from './cloud.js';
 // Contas locais: nick + senha (sem email). Os dados ficam no navegador; cada conta tem o proprio save.
 import { LEGACY_KEY } from './state.js';
 
@@ -6,7 +6,7 @@ const KEY = 'fazenda-accounts-v1', LAST = 'fazenda-last-nick', ITER = 60000;
 const enc = new TextEncoder();
 
 export const validNick = n => /^[A-Za-z0-9_-]{3,16}$/.test(n);
-export const saveKeyFor = nick => (vega?'vega-v1':LEGACY_KEY) + ':' + nick.toLowerCase();
+export const saveKeyFor = (nick, archive=archiveProfile) => (archive?'vega-v1':LEGACY_KEY) + ':' + nick.toLowerCase();
 
 function readAll() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
 function writeAll(o) { localStorage.setItem(KEY, JSON.stringify(o)); }

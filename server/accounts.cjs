@@ -2,10 +2,22 @@ const crypto = require('node:crypto');
 const { promisify } = require('node:util');
 const scrypt = promisify(crypto.scrypt);
 const original=require('./store.cjs');
-const vega=require('./vega.cjs');
+const storage=require('./vega.cjs');
 const {hash,fail}=original;
-const onVega=req=>new URL(req.url||'/', 'http://localhost').searchParams.get('server')==='vega';
-const backend=req=>onVega(req)?vega:original;
+const cloud=!!(process.env.VERCEL||process.env.BLOB_READ_WRITE_TOKEN);
+const primary=cloud?storage.primary:original;
+const backend=req=>req.archive?storage.archive:primary;
+const cookieName=archive=>archive?'orbital_vega':'orbital';
+const hasCookie=(req,name)=>(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));
+async function primaryAccount(nick){
+  const saved=await primary.read(nick);
+  if(saved||!cloud)return saved;
+  const legacy=await original.read(nick);
+  if(!legacy)return null;
+  // Create-only copy. Concurrent imports must use the winning revision.
+  try{await primary.write(legacy);return legacy;}
+  catch(error){if(!error.retryable)throw error;return primary.read(nick);}
+}
 const derive = (pass,salt) => scrypt(pass,salt,64,{N:32768,r:8,p:3,maxmem:64*1024*1024});
 const equal = (a,b) => a.length===b.length && crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
 async function body(req){
@@ -22,16 +34,20 @@ async function body(req){
   throw fail(400,'Dados inválidos.');
 }
 async function current(req){
-  const prefix=onVega(req)?'orbital_vega=':'orbital=';
-  const raw=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(prefix));
+  const preferArchive=hasCookie(req,'orbital_profile')?.endsWith('=archive');
+  req.archive=cloud && !!hasCookie(req,'orbital_vega') && (preferArchive||!hasCookie(req,'orbital'));
+  const prefix=cookieName(req.archive)+'=';
+  const raw=hasCookie(req,cookieName(req.archive));
   const cookie=raw?.slice(prefix.length).match(/^([A-Za-z0-9_-]{3,16})\.([0-9a-f]{64})$/);
-  const a=cookie&&await backend(req).read(cookie[1]),key=cookie&&hash(cookie[2]);
+  const a=cookie&&(req.archive?await storage.archive.read(cookie[1]):await primaryAccount(cookie[1])),key=cookie&&hash(cookie[2]);
   if(!a||!a.sessions.some(s=>s.hash===key&&s.until>Date.now()))throw fail(401,'Entre novamente para sincronizar.');
   return {a,key};
 }
 function cookie(req,res,value,max){
   const secure=!!process.env.VERCEL||req.socket?.encrypted||process.env.COOKIE_SECURE==='1';
-  res.setHeader('Set-Cookie',(onVega(req)?'orbital_vega=':'orbital=')+value+'; Path=/; HttpOnly; SameSite=Strict'+(secure?'; Secure':'')+(max===null?'':'; Max-Age='+max));
+  res.setHeader('Set-Cookie',[cookieName(req.archive)+'='+value+'; Path=/; HttpOnly; SameSite=Strict'+(secure?'; Secure':'')+(max===null?'':'; Max-Age='+max),
+    'orbital_profile='+(req.archive?'archive':'main')+'; Path=/; HttpOnly; SameSite=Strict'+(secure?'; Secure':'')+(max===null?'':'; Max-Age='+max),
+    cookieName(!req.archive)+'=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0']);
 }
 async function issue(req,res,a,remember){
   const token=crypto.randomBytes(32).toString('hex'),days=remember?90:1;
@@ -60,48 +76,69 @@ module.exports=async function api(req,res,route,attempt=0){
   const send=(status,data)=>res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data));
   try{
     if(req.headers.origin&&new URL(req.headers.origin).host!==req.headers.host)throw fail(403,'Origem inválida.');
-    if(route==='session'&&req.method==='GET')return send(200,view((await current(req)).a));
+    if(route==='session'&&req.method==='GET')return send(200,{...view((await current(req)).a),profile:req.archive?'archive':'main'});
     if(req.method!=='POST')throw fail(405,'Método inválido.');
     const data=await body(req);req.body=data;
-    if(['register','login','recover','copy'].includes(route)){
-      const {limit,read}=backend(req);
+    if(['register','login','recover'].includes(route)){
+      const {limit}=cloud?storage:original;
       await limit(String((process.env.VERCEL&&req.headers['x-vercel-forwarded-for'])||req.socket?.remoteAddress||'local').split(',')[0].trim());
       const nick=String(data.nick||'').trim(),pass=data.pass;
       if(!/^[A-Za-z0-9_-]{3,16}$/.test(nick)||typeof pass!=='string'||pass.length<4||pass.length>128)throw fail(400,'Use um nick de 3 a 16 caracteres e uma senha de 4 a 128.');
-      let a=await read(nick),recovery;
-      if(route==='copy'){
-        if(!onVega(req))throw fail(404,'Destino desconhecido.');
-        if(a)throw fail(409,'Esse nick já possui uma fazenda em Vega.');
-        const old=await original.read(nick);
-        const digest=(await derive(pass,old?.salt||'orbital-unregistered')).toString('hex');
-        if(!old||!equal(old.digest,digest))throw fail(401,'Nick ou senha do Orbital incorretos.');
-        const latest=await original.read(nick);
-        if(!latest||!equal(latest.digest,digest))throw fail(409,'A conta de origem mudou. Tente novamente.');
-        recovery=crypto.randomBytes(16).toString('hex');
-        a={nick:latest.nick,salt:latest.salt,digest,recovery:hash(recovery),sessions:[],revision:latest.save?1:0,save:allowedSave(latest.save,latest.nick)};
-      }else if(route==='register'){
+      const requestKey=typeof data.requestKey==='string'&&/^[a-f0-9-]{36}$/.test(data.requestKey)?data.requestKey:null;
+      const operation=requestKey&&hash(route+'|'+requestKey);
+      const newRecovery=salt=>requestKey?crypto.createHmac('sha256',requestKey).update(salt).digest('hex').slice(0,32):crypto.randomBytes(16).toString('hex');
+      async function replay(record){
+        if(!operation||record?.lastAuth!==operation)return false;
+        const digest=(await derive(pass,record.salt)).toString('hex');
+        return equal(record.digest,digest)&&equal(record.recovery,hash(newRecovery(record.salt)));
+      }
+      let a,recovery;
+      req.archive=false;
+      if(route==='register'){
         if(nick.toLowerCase()==='rick')throw fail(409,'Este nome é reservado.');
-        if(a)throw fail(409,'Nick já cadastrado neste servidor.');
-        const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
-        recovery=crypto.randomBytes(16).toString('hex');
-        if(await read(nick))throw fail(409,'Nick já cadastrado neste servidor.');
-        a={nick,salt,digest,recovery:hash(recovery),sessions:[],revision:validSave(data.initialSave)?1:0,save:validSave(data.initialSave)?allowedSave(data.initialSave,nick):null};
-      }else if(route==='login'){
-        const digest=(await derive(pass,a?.salt||'orbital-unregistered')).toString('hex');
-        a=await read(nick);if(!a||!equal(a.digest,digest))throw fail(401,'Nick ou senha incorretos.');
+        if(cloud&&await storage.archive.read(nick))throw fail(409,'Nick já cadastrado.');
+        a=await primaryAccount(nick);
+        if(a){
+          if(!await replay(a))throw fail(409,'Nick já cadastrado.');
+          recovery=newRecovery(a.salt);
+        }else{
+          const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
+          recovery=newRecovery(salt);
+          a={nick,salt,digest,lastAuth:operation,recovery:hash(recovery),sessions:[],revision:validSave(data.initialSave)?1:0,save:validSave(data.initialSave)?allowedSave(data.initialSave,nick):null};
+        }
       }else{
         const proof=hash(String(data.code||'').replace(/[-\s]/g,'').toLowerCase());
-        if(!a||!equal(proof,a.recovery))throw fail(401,'Nick ou chave de recuperação incorretos.');
-        const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
-        a=await read(nick);if(!equal(proof,a.recovery))throw fail(409,'A chave já foi trocada.');
-        recovery=crypto.randomBytes(16).toString('hex');Object.assign(a,{salt,digest,recovery:hash(recovery),sessions:[]});
+        const tryAccount=async record=>{
+          if(route==='recover')return !!record&&(equal(proof,record.recovery)||await replay(record));
+          const digest=(await derive(pass,record?.salt||'orbital-unregistered')).toString('hex');
+          return !!record&&equal(digest,record.digest);
+        };
+        const archiveFirst=hasCookie(req,'orbital_profile')?.endsWith('=archive')||
+          (!hasCookie(req,'orbital')&&!!hasCookie(req,'orbital_vega'));
+        const sources=cloud?(archiveFirst?[true,false]:[false,true]):[false];
+        let unavailable;
+        for(const archive of sources){
+          let candidate;
+          try{candidate=archive?await storage.archive.read(nick):await primaryAccount(nick);}
+          catch(error){if(error.status&&error.status<500)throw error;unavailable=error;continue;}
+          if(await tryAccount(candidate)){a=candidate;req.archive=archive;break;}
+        }
+        if(!a){
+          if(unavailable)throw fail(503,'Não foi possível consultar a conta original agora. Seu progresso continua guardado.');
+          throw fail(401,route==='recover'?'Nick ou chave incorretos.':'Nick ou senha incorretos.');
+        }
+        if(route==='recover'&&await replay(a))recovery=newRecovery(a.salt);
+        else if(route==='recover'){
+          const salt=crypto.randomBytes(16).toString('hex'),digest=(await derive(pass,salt)).toString('hex');
+          recovery=newRecovery(salt);Object.assign(a,{salt,digest,lastAuth:operation,recovery:hash(recovery),sessions:[]});
+        }
       }
-      await issue(req,res,a,!!data.remember);return send(200,{...view(a),recovery});
+      await issue(req,res,a,!!data.remember);return send(200,{...view(a),profile:req.archive?'archive':'main',recovery});
     }
     const {a,key}=await current(req);
     if(route==='admin')return send(200,{ok:true,...adminAction(a,data)});
     if(route==='save'){
-      if(data.nick!==a.nick)throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
+      if(data.nick!==a.nick||(data.profile&&data.profile!==(req.archive?'archive':'main')))throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');
       const opId=typeof data.opId==='string'&&/^[0-9a-f-]{36}$/.test(data.opId)?data.opId:null;
       if(opId && a.lastSaveId===opId && a.revision===data.revision+1)return send(200,{ok:true,revision:a.revision});
       if(data.revision!==a.revision)throw fail(409,'Há progresso mais recente em outro navegador. Reabra o jogo para carregá-lo.');

@@ -1,4 +1,4 @@
-import {visiting,vega} from './cloud.js';
+import {visiting,hosted} from './cloud.js';
 import {makeFarmer,animateFarmer,companion,PETS} from './actors.js';
 import {canModel} from './watering-can.js';
 import {planetAt} from './planets.js';
@@ -504,10 +504,17 @@ function setupTransportHandlers() {
 export async function hostRoom() {
   if (N.mode !== 'solo') return { ok: false, error: 'Voce ja esta em uma sala' };
   try {
-    const code = visiting?'0'+newCode().slice(1):vega?'1'+newCode().slice(1):newCode();
+    let code = visiting?'0'+newCode().slice(1):newCode();
     N.mode = 'joining';
     const handlers = setupTransportHandlers();
-    N.tr = visiting||vega ? await hostPeer(code,handlers) : relayAddress() && !LOCAL ? await connectRelay('host', code, handlers) : await (LOCAL ? hostLocal : hostPeer)(code, handlers);
+    if(!visiting && relayAddress() && !LOCAL){
+      try{N.tr=await connectRelay('host',code,handlers);}
+      catch(error){
+        if(!hosted || (error.status && error.status<500))throw error;
+        code='1'+code.slice(1);
+        N.tr=await hostPeer(code,handlers);
+      }
+    }else N.tr=await (LOCAL&&!visiting?hostLocal:hostPeer)(code,handlers);
     N.lastFarm = null; N.mode = 'host'; N.code = code; N.myId = N.tr.id;
     refreshChip();
     return { ok: true, code };
@@ -522,8 +529,7 @@ export async function joinRoom(code) {
     N.mode = 'joining';
     const handlers = setupTransportHandlers();
     if(visiting!==code.startsWith('0'))throw new Error('Contas e visitantes jogam em salas separadas. Confira o código.');
-    if(!visiting && vega!==code.startsWith('1'))throw new Error('Abra o mesmo servidor que o anfitrião.');
-    N.tr = visiting||vega ? await joinPeer(code,handlers) : relayAddress() && !LOCAL ? await connectRelay('join', code, handlers) : await (LOCAL ? joinLocal : joinPeer)(code, handlers);
+    N.tr = visiting||code.startsWith('1') ? await joinPeer(code,handlers) : relayAddress() && !LOCAL ? await connectRelay('join', code, handlers) : await (LOCAL ? joinLocal : joinPeer)(code, handlers);
     N.lastFarm = null; N.hostId = null; N.mode = 'guest'; N.code = code; N.myId = N.tr.id;
     let timer;
     try {

@@ -104,7 +104,7 @@ export function createUrgent() {
   const life=150+30*perk('prazo');
   const c = {
     id: state.contracts.nextId++, key: 'urgent_' + state.contracts.nextId, type: 'deliver', item: key, amount, progress: 0,
-    reward: { money: Math.round((amount * crop.sellPrice * 2.4 + 150)*(1+.1*perk('frete'))), xp: 60 + amount * 5, rp: 4 },
+    reward: { money: Math.round((amount * crop.sellPrice * 2.4 + 150)*(1+.1*perk('frete'))), xp: 60 + amount * 5, rp: 4+2*perk('laudo'), crystals:perk('aduana') },
     left: life, life, urgent: true
   };
   state.contracts.active.unshift(c);
@@ -113,7 +113,7 @@ export function createUrgent() {
 
 export function updateContracts(dt) {
   const k = state.contracts;
-  k.nextSpawn -= dt;
+  k.nextSpawn -= dt*(1+.12*perk('radio'));
   if (k.nextSpawn <= 0) {
     if (k.active.length < maxActive() && spawnContract()) k.nextSpawn = 45 + Math.random() * 40;
     else k.nextSpawn = 15;

@@ -1,5 +1,5 @@
 // Sistema de pesquisa: pontos de pesquisa (PP), arvore de tecnologias e laboratorio.
-import { state, bus, addRP, buildingLevel, hasResearch, hasBuilding } from './state.js';
+import { state, bus, perk, addRP, buildingLevel, hasResearch, hasBuilding } from './state.js';
 import { CONFIG } from './config.js';
 import { openModal, row, section, showToast, updateHUD, flash } from './ui.js';
 import { play } from './audio.js';
@@ -21,7 +21,7 @@ export const researchDroneDrain = () => (hasResearch('ai') ? 0.7 : 1);
 
 export function initResearch() {
   // PP ao colher, vender, concluir missoes e subir de nivel
-  bus.on('harvest', e => addRP(CONFIG.crops[e.crop].rp * (e.byDrone ? 0.6 : 1)));
+  bus.on('harvest', e => addRP(CONFIG.crops[e.crop].rp * (e.byDrone ? 0.6 : 1) + (e.byDrone?0:perk('amostras')) + (e.mutation?3*perk('genoma'):0)));
   bus.on('fruit', e => addRP(e.amount * 0.25 * (e.byDrone ? 0.6 : 1)));
   bus.on('sell', e => addRP(e.count * 0.12));
   bus.on('contractDone', c => addRP(c.reward.rp || 3));
@@ -32,7 +32,7 @@ export function initResearch() {
 // Laboratorio gera PP lentamente
 export function updateResearch(dt) {
   const lab = buildingLevel('lab');
-  if (lab) addRP(0.04 * lab * dt);
+  if (lab) addRP(0.04 * lab * dt * (1+.2*perk('bancada')));
 }
 
 function missing(id) {

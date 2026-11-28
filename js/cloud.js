@@ -1,14 +1,17 @@
 // O navegador mantém uma cópia local; o servidor controla a revisão entre dispositivos.
+import {serviceRequest} from './service-pool.js';
 export const hosted=document.querySelector('meta[name="orbital-relay"]')?.content==='/api/room';
-export const vega=hosted && new URLSearchParams(location.search).get('servidor')==='vega';
+export let archiveProfile=false;
+export function setProfile(profile){archiveProfile=profile==='archive';}
 export let visiting=false;
 export function enterVisitor(){visiting=true;}
 let revision=0,nick='',queued,flight=null,retry=0,blocked=false;
-const pendingKey=()=> (vega?'vega-pendente:':'orbital-pendente:')+nick.toLowerCase();
+const pendingKey=()=> (archiveProfile?'vega-pendente:':'orbital-pendente:')+nick.toLowerCase();
 export async function api(route,data){
   try{
+    if(route==='register'||route==='recover')data={...data,requestKey:crypto.randomUUID()};
     const opts=data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
-    const res=await fetch('/api/'+route+(vega?'?server=vega':''),{...opts,cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
+    const res=await serviceRequest(route,opts,{replay:['session','save','login','register','recover'].includes(route)});
     return {...await res.json(),status:res.status};
   }catch{return {ok:false,error:'Servidor indisponível. Verifique a conexão e tente de novo.'};}
 }
@@ -56,7 +59,7 @@ export async function flush(){
   }
   journal();
   flight=(async()=>{
-    const r=await api('save',{nick,revision,opId:sending.id,save:sending.save});
+    const r=await api('save',{nick,profile:archiveProfile?'archive':'main',revision,opId:sending.id,save:sending.save});
     if(r.ok){
       revision=r.revision;lastSuccess=Date.now();sending=null;failures=0;journal();message('');
     }else{
