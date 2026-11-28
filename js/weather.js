@@ -102,21 +102,40 @@ function vaporMap(){
 export function cloudField(scene){
   const group=new THREE.Group();scene.add(group);
   const uniforms={vapor:{value:vaporMap()},wind:{value:new THREE.Vector2()},evolution:{value:0},
-    cover:{value:0},squall:{value:0},lowDetail:{value:false},sunDir:{value:new THREE.Vector2()},lit:{value:new THREE.Color()},base:{value:new THREE.Color()}};
+    frontMix:{value:new THREE.Vector3()},cover:{value:0},squall:{value:0},lowDetail:{value:false},sunDir:{value:new THREE.Vector2()},lit:{value:new THREE.Color()},base:{value:new THREE.Color()}};
   const density=`
     uniform sampler2D vapor;uniform vec2 wind,sunDir;uniform float cover,evolution,squall;
-    uniform bool lowDetail;
+    uniform bool lowDetail;uniform vec3 frontMix;
     float front(vec2 uv){
       return .5+.5*sin(uv.x*9.+uv.y*4.+2.*sin(uv.y*8.+evolution*4.));
     }
     float density(vec2 p){
       vec2 uv=p*.0036+wind;
+      float detail=0.;
+      if(frontMix.x>.002){
+        // Cirros finos arrastam a umidade em pinceladas diagonais.
+        uv+=frontMix.x*vec2(.16*sin(9.*uv.y+evolution),.35*uv.x);
+        detail+=frontMix.x*.075*sin(56.*uv.y+8.*sin(uv.x*8.));
+      }
+      if(frontMix.y>.002){
+        vec2 arm=(p-vec2(-56.,-88.))*.009;
+        float r=length(arm);
+        float turn=frontMix.y*2.6*exp(-r);
+        uv+=.28*(mat2(cos(turn),-sin(turn),sin(turn),cos(turn))*arm-arm);
+        float theta=atan(arm.y,arm.x+.00001);
+        detail+=frontMix.y*(.13*cos(3.*theta-8.*r+evolution*14.)*exp(-.62*r)-.42*exp(-14.*r*r));
+      }
+      if(frontMix.z>.002){
+        // Fileiras lenticulares com bordas afiladas e intervalos de céu.
+        float ridge=cos(uv.y*33.+uv.x*11.+2.*sin(uv.x*8.));
+        detail+=frontMix.z*(.19*ridge+.052*cos(uv.x*37.));
+      }
       float bank=front(uv)*squall;
-      if(lowDetail)return texture2D(vapor,uv).r+cover*.12+bank*.09;
+      if(lowDetail)return texture2D(vapor,uv).r+cover*.12+bank*.09+detail;
       vec2 curl=texture2D(vapor,uv*.57+vec2(evolution,0.)).rg-.5;
       vec2 field=texture2D(vapor,uv+curl*(.26+.48*squall)+vec2(.085*bank,0.)).rg;
       float wisps=texture2D(vapor,uv*2.83-curl*.32-wind*.44).g;
-      return field.r*.68+field.g*.21+wisps*.11+cover*.12+bank*.09;
+      return field.r*.68+field.g*.21+wisps*.11+cover*.12+bank*.09+detail;
     }`;
   const surface=new THREE.ShaderMaterial({uniforms,transparent:true,depthWrite:false,side:THREE.DoubleSide,
     vertexShader:`varying vec3 wp;void main(){wp=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.);}`,
@@ -133,6 +152,9 @@ export function cloudField(scene){
         vec3 ink=mix(base,lit,mix(relief,smoothstep(.24,.8,relief),.24));
         float shelf=front(wp.xz*.0036+wind);
         ink*=1.-squall*(.20+.38*shelf)*smoothstep(.45,.7,d);
+        ink+=edge*(frontMix.x*vec3(.13,.21,.23)+frontMix.y*vec3(.14,.05,.18));
+        float nacre=.5+.5*sin(wp.z*.14+wp.x*.055+evolution*9.);
+        ink+=frontMix.z*edge*mix(vec3(.18,.07,.09),vec3(.03,.18,.15),nacre);
         gl_FragColor=vec4(ink,a);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -163,9 +185,14 @@ export function cloudField(scene){
   curtain.position.set(0,59,-14);curtain.visible=false;group.add(curtain);
   const shade=new THREE.Color(0xa2afcb),stormShade=new THREE.Color(0x565f79);
   const day=new THREE.Color(0xfffbef),night=new THREE.Color(0x7987aa),dusk=new THREE.Color(0xffc29c);
+  const iceLight=new THREE.Color(0xe3faff),vortexBase=new THREE.Color(0x4d467b),pearlLight=new THREE.Color(0xffdbbd);
   let amount=0, gustTime=0;
   function update(dt,time,event,viewer){
-    const target=event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.85 : event==='rainbow' ? -.32 : event==='dew' ? .42 : event==='solstice' ? -.38 : 0;
+    const fronts=uniforms.frontMix.value,blend=1-Math.exp(-dt*.30);
+    fronts.x+=((event==='frostfront'?1:0)-fronts.x)*blend;
+    fronts.y+=((event==='vortex'?1:0)-fronts.y)*blend;
+    fronts.z+=((event==='lenticular'?1:0)-fronts.z)*blend;
+    const target=event==='frostfront'?-.16:event==='vortex'?.84:event==='lenticular'?.28:event==='tempest'?1:event==='rain' ? .7 : event==='drought' ? -.85 : event==='rainbow' ? -.32 : event==='dew' ? .42 : event==='solstice' ? -.38 : 0;
     amount+=(target-amount)*(1-Math.exp(-dt*.23));
     const gust=uniforms.squall;
     gust.value+=((event==='tempest'?1:0)-gust.value)*(1-Math.exp(-dt*.34));
@@ -178,11 +205,13 @@ export function cloudField(scene){
     const speed=.0026+Math.max(amount,0)*.004+gust.value*(.009+.004*Math.sin(gustTime*.85));
     uniforms.wind.value.x-=dt*speed;
     uniforms.wind.value.y-=dt*speed*(.24+gust.value*.22*Math.sin(gustTime*.52));
-    uniforms.evolution.value+=dt*(.002+gust.value*.019);
+    uniforms.evolution.value+=dt*(.002+gust.value*.019+fronts.y*.032);
     uniforms.sunDir.value.set(Math.cos(a),Math.sin(a));
     uniforms.lit.value.copy(night).lerp(day,daylight).lerp(dusk,sunset*.72).lerp(shade,Math.max(0,amount)*.63);
     uniforms.base.value.copy(night).lerp(shade,daylight).lerp(stormShade,Math.max(0,amount));
-    veil.position.set(viewer?.x??0,63-amount*19,viewer?.z??0);veil.updateMatrix();
+    uniforms.lit.value.lerp(iceLight,.48*fronts.x).lerp(pearlLight,.38*fronts.z);
+    uniforms.base.value.lerp(vortexBase,.72*fronts.y);
+    veil.position.set(viewer?.x??0,63-amount*19+fronts.x*10+fronts.z*6,viewer?.z??0);veil.updateMatrix();
   }
   function quality(level){uniforms.lowDetail.value=level==='baixa';veil.castShadow=level==='alta';}
   update(0,10,null);return {group,update,quality};

@@ -148,7 +148,7 @@ export function addXp(amount) {
     state.xp -= state.xpNeeded;
     state.level++;
     state.xpNeeded = state.level > 12 ? state.xpNeeded + 240 : Math.round(state.xpNeeded * 1.4);
-    state.money += 75;
+    state.money += 35;
     bus.emit('level', state.level);
   }
 }

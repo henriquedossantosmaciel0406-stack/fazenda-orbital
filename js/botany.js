@@ -77,7 +77,7 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
   const {leaf,rod,oval,gem,part}=tools(group,leafKind);
   const base=CONFIG.crops[key].color;
   const col=sick ? 0xB99550 : mutation ? blend(base,mutation.color,0.65) : base;
-  const greens={miralume:0x406e77,heliobell:0x6c804c,nixpearl:0x565782,radish:0x51894F,okra:0x37865F,pineapple:0x3E877D,lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,prism:0x2E8F86,sunflower:0x4F8C3A,voidberry:0x4A4F9A,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
+  const greens={sundial:0x668b57,spiralpod:0x488d82,moonfan:0x686699,miralume:0x406e77,heliobell:0x6c804c,nixpearl:0x565782,radish:0x51894F,okra:0x37865F,pineapple:0x3E877D,lettuce:0x58A540,carrot:0x3B9363,corn:0x39987D,strawberry:0x467755,tomato:0x45744F,pepper:0x277C64,grape:0x508F84,flower:0x5A8B70,prism:0x2E8F86,sunflower:0x4F8C3A,voidberry:0x4A4F9A,lotus:0x2C938A,pumpkin:0x5B874D,melon:0x389775,mushroom:0x6E737F};
   const fern=sick?0x817346:greens[key],mint=sick?0xADA053:blend(fern,0xEBF997,.48);
   const scale=0.32+0.68*g, ripe=g>0.55;
   group.scale.setScalar(scale);
@@ -87,7 +87,42 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
   function blossom(x,y,z,r,color) {
     ring(x,y,z,5,r,r*0.33,0.2,color); oval(x,y+0.025,z,r*0.22,r*0.18,r*0.22,0xFFD077);
   }
-  if (key==='lettuce') {
+  if(key==='sundial'){
+    ring(0,.12,0,8,.72,.15,.42,fern);
+    rod([0,0,0],[0,1.12,0],.065,fern);
+    const disc=new THREE.Group();group.add(disc);disc.position.y=1.15;disc.rotation.z=-.42;
+    const face=tools(disc,'petal');
+    face.oval(0,0,0,.43,.1,.43,0xbf7039);
+    for(let i=0;i<(ripe?12:6);i++){
+      const a=i*TAU/(ripe?12:6);face.leaf(0,.04,0,a,.62,.13,ripe?.12:.94,col);
+      if(ripe)face.gem(.33*Math.sin(a),.11,.33*Math.cos(a),.028,.046,.028,0xffed9a);
+    }
+    if(ripe)face.rod([0,.05,0],[.17,.48,.04],.067,0xffdf81,.09);
+  }else if(key==='spiralpod'){
+    rod([0,0,0],[0,1.85,0],.047,fern);
+    let last=[0,.09,0];
+    for(let i=0;i<=Math.floor(6+g*13);i++){
+      const a=i*.7,rad=.3+.1*Math.sin(i*.18),tip=[rad*Math.cos(a),.12+i*.093,rad*Math.sin(a)];
+      rod(last,tip,.032,mint);
+      if(i%3===2){
+        leaf(...tip,1.57-a,.49,.12,.36,fern);
+        if(ripe){const pod=oval(tip[0],tip[1]-.19,tip[2],.105,.255,.12,col);pod.rotation.z=.32*Math.sin(a);}
+      }
+      last=tip;
+    }
+  }else if(key==='moonfan'){
+    for(let j=0;j<3;j++){
+      const fan=new THREE.Group();fan.position.set((j-1)*.32,.1,(j%2)*.19);fan.rotation.y=j*1.95;
+      group.add(fan);const f=tools(fan,'petal');
+      for(let i=-3;i<=3;i++){
+        const angle=i*(.11+.09*g),h=.8+.55*g-.06*Math.abs(i),x=h*Math.sin(angle),y=h*Math.cos(angle);
+        const blade=f.oval(x*.51,y*.51,0,.15+.05*g,h*.57,.07,blend(fern,col,.36+.12*(3-Math.abs(i))));
+        blade.rotation.z=-angle;
+        f.rod([0,.07,.055],[x,y,.055],.018,mint);
+        if(ripe)f.gem(x,y,.045,.064,.09,.05,col);
+      }
+    }
+  }else if (key==='lettuce') {
     const leaves=5+Math.floor(g*13);
     for(let i=0;i<leaves;i++){
       const layer=i/(leaves-1),angle=i*spiral;
@@ -251,6 +286,32 @@ export function fillCrop(P,key,g,ready,sick,mutation) {
       rod([0,0.85,0],[0.12,1.19,0.06],0.11,fern);
     }
   }
+  if(mutation && g>.22){
+    const at=mutation;
+    if(at===CONFIG.mutations.rime){
+      for(let i=0;i<5;i++){
+        const a=i*TAU/5,x=.66*Math.sin(a),z=.66*Math.cos(a),y=.34+.14*(i%3);
+        rod([x,y-.27,z],[x,y+.31,z],.022,0xc4f5ff);
+        for(const side of [-1,1])for(let j=0;j<2;j++)
+          rod([x,y+.12*j,z],[x+side*.15*Math.cos(a),y+.13+.12*j,z-side*.15*Math.sin(a)],.018,0x9bdaec);
+      }
+    }else if(at===CONFIG.mutations.firefly){
+      for(let i=0;i<7;i++){const a=i*spiral,x=.76*Math.cos(a),z=.76*Math.sin(a),y=.43+.16*(i%4);
+        gem(x,y,z,.069,.091,.069,0xffea76);leaf(x,y+.05,z,a,.13,.046,.36,0xc6edb4);}
+    }else if(at===CONFIG.mutations.geode){
+      for(let i=0;i<5;i++){const a=i*spiral,x=.56*Math.sin(a),z=.56*Math.cos(a);
+        gem(x,.15,z,.23,.18,.22,0x565078);
+        for(let j=-1;j<=1;j++)gem(x+.074*j,.32,z,.063,.19+.08*(1-Math.abs(j)),.065,j?0xb299ec:0xf5ccff).rotation.z=-j*.27;}
+    }else if(at===CONFIG.mutations.corona){
+      const rim=part(geo('tor',.43,.037,5,18),0xfbb948,0,1.54,0);rim.rotation.x=Math.PI/2;
+      for(let i=0;i<8;i++){const a=i*TAU/8;gem(.43*Math.cos(a),1.68,.43*Math.sin(a),.065,i%2?.14:.22,.065,0xffdd75);}
+    }else if(at===CONFIG.mutations.satellite){
+      const orbit=new THREE.Group();group.add(orbit);orbit.position.y=.9;orbit.rotation.z=.32;
+      const o=tools(orbit);
+      o.part(geo('tor',.85,.023,5,24),0xecacd3,0,0,0).rotation.x=Math.PI/2;
+      for(let i=0;i<3;i++){const a=i*TAU/3;o.oval(.85*Math.cos(a),0,.85*Math.sin(a),.11,.11,.11,i===0?0xffcc83:0xb8b5fd);}
+    }
+  }
 }
 
 // Um único volume por fruto evita que duas cascas quase coincidentes pisquem ao longe.
@@ -266,7 +327,7 @@ function fruitSkin(type) {
     if(type==='apple'){
       width=1+.14*y+.045*Math.cos(5*angle)*(1-y*y);
       height=y-.22*Math.max(0,y)**10+.08*Math.max(0,-y)**9;
-    }else if(type==='pear'){
+    }else if(type==='lanterntree'){width=.84+.14*Math.cos(6*angle)-.15*y;}else if(type==='ringfig'){width=1-.32*y;}else if(type==='pear'){
       width=1-.52*y-.16*Math.exp(-10*(y-.55)**2);
     }else if(type==='starfruit'){
       width=.79+.28*Math.cos(angle*5);
@@ -283,7 +344,7 @@ function fruitSkin(type) {
 }
 
 const fruitSize={
-  pear:[.22,.36,.22],starfruit:[.30,.37,.30],apple:[.27,.28,.26],orange:[.245,.235,.245],peach:[.28,.29,.25],
+  lanterntree:[.23,.36,.23],ringfig:[.21,.27,.21],pear:[.22,.36,.22],starfruit:[.30,.37,.30],apple:[.27,.28,.26],orange:[.245,.235,.245],peach:[.28,.29,.25],
   cherry:[.164,.15,.16],coconut:[.225,.32,.205],crystaltree:[.195,.34,.195]
 };
 
@@ -312,6 +373,11 @@ function addRipeFruit(group,type,anchor,angle,slot) {
     if(type==='coconut'){
       for(const [px,py] of [[-.065,.045],[.064,.045],[0,-.05]])
         oval(px,py,.194,.029,.034,.018,0x513827);
+    }else if(type==='ringfig'){
+      part(geo('tor',.265,.038,5,16),0xeab86d,0,-.025,0).rotation.x=1.32;
+    }else if(type==='lanterntree'){
+      for(let i=0;i<5;i++)leaf(0,h*.86,0,i*TAU/5,.19,.065,-.46,0x6ba48c);
+      gem(0,-h*.91,0,.045,.082,.045,0xffdc81);
     }else if(type==='orange'){
       for(let i=0;i<5;i++)leaf(0,h*.97,0,i*TAU/5,.105,.032,-.34,0x589354);
       for(const [px,py] of [[-.10,.04],[-.058,.092],[-.128,-.015]]){
@@ -328,7 +394,7 @@ function addRipeFruit(group,type,anchor,angle,slot) {
 }
 
 const crowns = {
-  pear:[5,.75,2.45,.57,.83],starfruit:[7,1.35,1.70,.52,.38],apple: [5,1.05,1.75,0.70,0.73], orange:[7,0.82,2.05,0.60,0.93],
+  lanterntree:[6,1.28,2.28,.65,.54],ringfig:[7,1.48,1.93,.67,.36],pear:[5,.75,2.45,.57,.83],starfruit:[7,1.35,1.70,.52,.38],apple: [5,1.05,1.75,0.70,0.73], orange:[7,0.82,2.05,0.60,0.93],
   peach:[4,1.27,1.48,0.80,0.49], cherry:[8,1.46,2.06,0.62,0.38],
   coconut:[9,1.2,3.1,0,0], crystaltree:[6,0.95,1.85,0.41,1.04]
 };
@@ -355,7 +421,16 @@ export function fillTree(P,type,g,fruits) {
       anchors.push([lean+dx*0.47,h-0.21,dz*0.47]);
     } else {
       rod([lean*0.4,h*0.56,0],[x,y,z],0.115,bark,0.36);
-      if(type==='starfruit'){
+      if(type==='lanterntree'){
+        oval(x,y+.23,z,w,.4,w,tint);
+        for(let k=-1;k<=1;k++){
+          const bx=x+.24*k*dz,bz=z-.24*k*dx;
+          rod([bx,y+.28,bz],[bx+dx*.2,y-.64,bz+dz*.2],.026,tint);
+          for(let j=0;j<3;j++)leaf(bx+dx*j*.07,y+.17-j*.25,bz+dz*j*.07,a+k*.6,.51,.11,-.64,tint);
+        }
+      }else if(type==='ringfig'){
+        for(let j=0;j<4;j++)leaf(x,y+.13,z,a+j*1.35,.93,.31,.28,tint);
+      }else if(type==='starfruit'){
         for(let j=0;j<4;j++){
           const t=(j+1)/4;
           for(const side of [-1,1])leaf(lean+dx*radius*t,h*.56+(y-h*.56)*t,dz*radius*t,a+side*.92,.66,.16,-.12,tint);
@@ -396,17 +471,15 @@ export function fillTree(P,type,g,fruits) {
   if(g<1) return;
   // As posições dependem do ramo, nunca da quantidade de frutos restantes.
   for(let i=0;i<Math.min(fruits,def.maxFruits);i++){
-    const slot=(i*(n%2===0?n-1:2))%n;
-    const angle=slot*TAU/n+.25;
+    // Cada fruto tem seu próprio lugar, mesmo quando há mais frutos do que galhos.
+    const count=def.maxFruits;
+    const sector=(i%2===0?i/2:Math.ceil(count/2)+(i-1)/2);
+    const angle=sector*TAU/count+.25;
+    const slot=Math.round(sector*n/count)%n;
     const [ax,ay,az]=anchors[slot];
-    const paired=i%n<def.maxFruits-n;
-    const offset=paired?(i<n?-.32:.32):0;
-    const anchor=palm?[lean+Math.sin(angle)*.21,h-.035,Math.cos(angle)*.21]:
-      [ax+Math.cos(angle)*offset,ay+.13,az-Math.sin(angle)*offset];
-    if(ice){
-      // O graveto sai da ponta real do galho, no interior do cristal azul.
-      rod([lean+Math.sin(angle)*r,h+(slot%2)*.28,Math.cos(angle)*r],anchor,.046,0x8ABBC7);
-    }
+    const radius=palm?.62:Math.hypot(ax-lean,az)+.12;
+    const anchor=[lean+Math.sin(angle)*radius,ay+.09-.14*(sector%2),Math.cos(angle)*radius];
+    rod([ax,ay+.20,az],anchor,palm?.057:.035,ice?0x8abbc7:bark);
     addRipeFruit(group,type,anchor,angle,i);
   }
 }

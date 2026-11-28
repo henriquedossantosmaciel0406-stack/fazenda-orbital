@@ -66,7 +66,8 @@ function rollMutation() {
   const mult = (hasResearch('genetics') ? 1.7 : 1) * (1 + .12 * perk('mut')) * (eventActive('pollen') ? 1.35 : 1);
   for (const k of CONFIG.mutationOrder) {
     const m = CONFIG.mutations[k];
-    if (state.level >= m.level && Math.random() < m.chance * mult) return k;
+    const favored=(k==='rime'&&eventActive('frostfront'))||(k==='geode'&&eventActive('vortex'));
+    if (state.level >= m.level && Math.random() < m.chance * mult * (favored?3:1)) return k;
   }
   return null;
 }
@@ -204,7 +205,7 @@ function harvestPlot(plot, byDrone) {
   if (!plot.crop) return false;
   const crop = CONFIG.crops[plot.crop];
   if (plot.progress < crop.growTime) return false;
-  const free = stockFree();
+  const free = Math.floor(stockFree());
   if (free <= 0) {
     if (!byDrone) { showToast('Estoque cheio. Venda no Mercado ou construa um Silo.', 'bad'); play('error'); }
     return false;
@@ -213,7 +214,8 @@ function harvestPlot(plot, byDrone) {
   let amount = state.yieldLevel * (mut ? mut.yield : 1) * (1 + 0.1 * perk('yield'));
   if (hasResearch('organic') && Math.random() < 0.3) amount *= 2;
   if (Math.random() < soilDouble()) amount *= 2;
-  amount = Math.min(amount, free);
+  const whole=Math.floor(amount);
+  amount=Math.min(whole+(Math.random()<amount-whole?1:0),free);
   if (mut) { const k = mutKey(mutKeyName, plot.crop); state.mutated[k] = (state.mutated[k] || 0) + amount; state.stats.mutations++; }
   else state.crops[plot.crop] += amount;
   if (hasResearch('recycle') && Math.random() < 0.35) { state.seeds[plot.crop]++; if (!byDrone) showToast('Semente recuperada', 'good'); }
@@ -254,7 +256,7 @@ function updatePlots(dt, t) {
       const crop = CONFIG.crops[p.crop];
       p.water = Math.max(0, p.water - 0.04 * evap * dt);
       if (irrigation && p.water < 1.5) p.water = 1.5;
-      if (p.progress < crop.growTime) p.progress = Math.min(crop.growTime, p.progress + growthCredit(p,dt * (0.35 + p.water * 0.08) * gm * (p.sick ? 0.4 : 1)));
+      if (p.progress < crop.growTime) p.progress = Math.min(crop.growTime, p.progress + growthCredit(p,dt * (crop.growthAt?.(state.time,p.water)??1) * (0.35 + p.water * 0.08) * gm * (p.sick ? 0.4 : 1)));
       const gg = p.progress / crop.growTime;
       const key = p.crop + ':' + Math.min(5, Math.floor(gg * 5)) + (gg >= 1 ? 'r' : '') + (p.sick ? 's' : '') + (p.mutation ? ':' + p.mutation : '');
       if (p.dirty || key !== p.stageKey) { p.stageKey = key; p.dirty = false; buildCrop(p); }
@@ -280,6 +282,7 @@ function buildTree(inst) {
 }
 
 function createTreeInstance(data, animate) {
+  data.fruits=Math.min(CONFIG.trees[data.type].maxFruits,Math.max(0,Math.ceil(data.fruits||0)));
   data.claimedBy = 0;
   const group = new THREE.Group(); group.position.set(data.x, 0, data.z);
   scene.add(group);
@@ -298,7 +301,7 @@ function treeKey(data) {
 function harvestTree(tree, byDrone) {
   if (tree.fruits <= 0) return false;
   const d = CONFIG.trees[tree.type];
-  const free = stockFree();
+  const free = Math.floor(stockFree());
   if (free <= 0) { if (!byDrone) { showToast('Estoque cheio. Venda frutos no Mercado ou construa um Silo.', 'bad'); play('error'); } return false; }
   const n = Math.min(tree.fruits, free);
   state.fruits[tree.type] += n; tree.fruits -= n; state.stats.fruits += n;
@@ -763,9 +766,9 @@ function openGeneralStore() {
       const c = CONFIG.crops[k], locked = !cropUnlocked(c);
       return {
         thumb:k, color: c.color, title: 'Semente de ' + c.name,
-        species: {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática',radish:'Raiz arredondada',okra:'Vagem estriada',pineapple:'Fruto de coroa'}[k],
+        species: c.species || {lettuce:'Folhas em roseta',strawberry:'Fruto com aquênios',carrot:'Raiz de reserva',corn:'Espiga de cereal',tomato:'Fruto de solanácea',mushroom:'Fungo de chapéu',grape:'Bagas em cacho',flower:'Floração ornamental',pumpkin:'Fruto de rama',melon:'Fruto de rama',pepper:'Fruto de solanácea',lotus:'Flor aquática',radish:'Raiz arredondada',okra:'Vagem estriada',pineapple:'Fruto de coroa'}[k],
         growing: [['Raridade',seedRarity(c)],['Colheita',c.growTime+' s'],['Água',c.waterUse],['Venda',c.sellPrice+' CR']],
-        desc: 'Pacote de sementes · '+c.seedCost+' CR por unidade',
+        desc: (c.trait?c.trait+' ':'')+'Pacote de sementes · '+c.seedCost+' CR por unidade',
         tag: locked ? (state.prestige.rank < (c.prestige || 0) ? 'PRESTIGIO ' + c.prestige : 'NIVEL ' + c.level) : 'Voce tem ' + state.seeds[k], tagCls: locked ? 'bad' : '', locked,
         buttons: [
           { label: 'Comprar 1', disabled: locked || state.money < c.seedCost, onClick: () => buySeed(k, 1) },

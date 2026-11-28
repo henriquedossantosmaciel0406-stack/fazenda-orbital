@@ -10,6 +10,9 @@ import { createUrgent } from './contracts.js';
 // Aparencia do ceu/luz durante eventos (interpolada a cada quadro, sem alocar)
 export const weatherVisual = { color: new THREE.Color(0x000000), amount: 0, light: 1 };
 const TARGETS = {
+  frostfront:{color:new THREE.Color(0xa8dce9),amount:.38,light:.94},
+  vortex:{color:new THREE.Color(0x7768a7),amount:.48,light:.73},
+  lenticular:{color:new THREE.Color(0xf1b798),amount:.28,light:1.07},
   pollen: {color:new THREE.Color(0xFDD98D),amount:.26,light:1.04},
   dew: {color:new THREE.Color(0xABCFE0),amount:.36,light:.88},
   solstice: {color:new THREE.Color(0xFFC476),amount:.33,light:1.13},
@@ -26,10 +29,10 @@ const TARGETS = {
 let bannerTimer = 0, solarFlashTimer = 0;
 
 // ---- Multiplicadores consultados por outros sistemas ----
-export const growthEventMult = () => (eventActive('rain') ? 1.5 : eventActive('rainbow') ? 1.25 : eventActive('solstice') ? 1.20 : 1);
-const GOOD = new Set(['rain', 'rainbow', 'festival','aurora','pollen','dew','solstice']);
-export const evaporationMult = () => (eventActive('drought') ? 1 + 1.5 * (1 - mitigation()) : eventActive('dew') ? .5 : 1)/(1+.15*perk('orvalho'));
-export const energyEventMult = () => eventActive('aurora')?1.45:(eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : eventActive('solstice') ? 1.15 : 1);
+export const growthEventMult = () => (eventActive('lenticular') ? 1.15 : eventActive('rain') ? 1.5 : eventActive('rainbow') ? 1.25 : eventActive('solstice') ? 1.20 : 1);
+const GOOD = new Set(['rain', 'rainbow', 'festival','aurora','pollen','dew','solstice','frostfront','lenticular']);
+export const evaporationMult = () => (eventActive('drought') ? 1 + 1.5 * (1 - mitigation()) : eventActive('frostfront') ? .55 : eventActive('dew') ? .5 : 1)/(1+.15*perk('orvalho'));
+export const energyEventMult = () => eventActive('vortex')?1-.25*(1-mitigation()):eventActive('aurora')?1.45:(eventActive('solar') ? 1 - 0.8 * (1 - mitigation()) : eventActive('solstice') ? 1.15 : 1);
 export const rainWaterGain = () => eventActive('tempest') ? 0.85 : (eventActive('rain') ? 0.4 : 0);
 export const sellEventMult = crop => (state.boom && state.boom.crop === crop ? state.boom.mult : 1) * (eventActive('festival') ? 1.25 : 1);
 

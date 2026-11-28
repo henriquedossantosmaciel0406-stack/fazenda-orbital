@@ -1,5 +1,5 @@
 // Sistema de pesquisa: pontos de pesquisa (PP), arvore de tecnologias e laboratorio.
-import { state, bus, perk, addRP, buildingLevel, hasResearch, hasBuilding } from './state.js';
+import { state, bus, save, walletLabel, perk, addRP, buildingLevel, hasResearch, hasBuilding } from './state.js';
 import { CONFIG } from './config.js';
 import { openModal, row, section, showToast, updateHUD, flash } from './ui.js';
 import { play } from './audio.js';
@@ -47,13 +47,16 @@ function missing(id) {
 function doResearch(id) {
   const r = CONFIG.research[id];
   if (hasResearch(id) || missing(id)) return;
+  if(state.money<r.credits){showToast('Créditos insuficientes para esta pesquisa.','bad');play('error');return;}
   if (state.rp < r.cost) { showToast('Pontos de pesquisa insuficientes', 'bad'); play('error'); return; }
   state.rp -= r.cost;
+  state.money -= r.credits;
   state.research[id] = true;
   state.stats.research++;
   play('mission'); flash('research');
   showToast('Pesquisa concluida: ' + r.name, 'mission');
   bus.emit('research', id);
+  save();
   updateHUD();
 }
 
@@ -63,11 +66,11 @@ export function openLab() {
     build(body) {
       const head = document.createElement('div');
       head.className = 'summary';
-      head.innerHTML = '<span>PONTOS DE PESQUISA</span><b>' + Math.floor(state.rp) + ' PP</b>';
+      head.innerHTML = '<span>RECURSOS</span><b>' + walletLabel() + ' CR · ' + Math.floor(state.rp) + ' PP</b>';
       body.append(head);
       const info = document.createElement('p');
       info.className = 'hint';
-      info.textContent = 'Ganhe PP colhendo, vendendo e concluindo contratos e missoes. O laboratorio tambem gera PP sozinho.';
+      info.textContent = 'Cada tecnologia custa créditos e pontos de pesquisa. Ganhe PP com colheitas, vendas, missões e o laboratório.';
       body.append(info);
       const ids = Object.keys(CONFIG.research).sort((a, b) => tierOf(a) - tierOf(b) || CONFIG.research[a].level - CONFIG.research[b].level);
       let lastTier = -1;
@@ -79,8 +82,8 @@ export function openLab() {
         const done = hasResearch(id), why = done ? null : missing(id);
         list.append(row({
           icon: r.icon, title: r.name, desc: r.desc, done, locked: !!why && !done,
-          tag: done ? 'CONCLUIDA' : why ? why.toUpperCase() : r.cost + ' PP', tagCls: done ? 'good' : why ? 'bad' : '',
-          buttons: done ? [] : [{ label: 'Pesquisar', disabled: !!why || state.rp < r.cost, onClick: () => doResearch(id) }]
+          tag: done ? 'CONCLUIDA' : why ? why.toUpperCase() : r.credits + ' CR · ' + r.cost + ' PP', tagCls: done ? 'good' : why ? 'bad' : '',
+          buttons: done ? [] : [{ label: 'Pesquisar', disabled: !!why || state.rp < r.cost || state.money < r.credits, onClick: () => doResearch(id) }]
         }));
       }
       body.append(list);

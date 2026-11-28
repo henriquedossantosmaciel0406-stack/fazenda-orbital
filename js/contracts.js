@@ -104,7 +104,7 @@ export function createUrgent() {
   const life=150+30*perk('prazo');
   const c = {
     id: state.contracts.nextId++, key: 'urgent_' + state.contracts.nextId, type: 'deliver', item: key, amount, progress: 0,
-    reward: { money: Math.round((amount * crop.sellPrice * 2.4 + 150)*(1+.1*perk('frete'))), xp: 60 + amount * 5, rp: 4+2*perk('laudo'), crystals:perk('aduana') },
+    reward: { money: Math.round((amount * crop.sellPrice * 1.65 + 75)*(1+.1*perk('frete'))), xp: 60 + amount * 5, rp: 4+2*perk('laudo'), crystals:perk('aduana') },
     left: life, life, urgent: true
   };
   state.contracts.active.unshift(c);
@@ -148,9 +148,9 @@ function deliver(c) {
 }
 
 function claim(c) {
-  if (c.progress < c.amount) return;
-  applyReward(c.reward);
+  if (c.progress < c.amount || !state.contracts.active.includes(c)) return;
   state.contracts.active = state.contracts.active.filter(x => x !== c);
+  applyReward(c.reward);
   state.contracts.done++; state.stats.contracts++;
   play('mission');
   showToast('Contrato concluido! ' + rewardText(c.reward), 'mission');
@@ -211,7 +211,7 @@ export function initMissions() {
     trackObjective('sell', e.count);
     addProgress(['sell'], null, e.count);
   });
-  bus.on('level', l => { showToast('Nivel ' + l + '! +75 CR', 'mission'); play('upgrade'); trackObjective('level', 0); });
+  bus.on('level', l => { showToast('Nivel ' + l + '! +35 CR', 'mission'); play('upgrade'); trackObjective('level', 0); });
   bus.on('drone', () => trackObjective('drone'));
   bus.on('build', () => trackObjective('build'));
   bus.on('contract', () => trackObjective('contract'));

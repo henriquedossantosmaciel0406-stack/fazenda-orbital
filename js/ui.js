@@ -415,7 +415,7 @@ async function openAdmin(){
   const {prankNames}=await import('./farm-pranks.js');
   const {netInfo,requestRoomAdmin}=await import('./net.js');
   const groups=[
-    ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow','dew','pollen','solstice'].map(id=>[id,CONFIG.events[id].name])]],
+    ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow','dew','pollen','solstice','frostfront','vortex','lenticular'].map(id=>[id,CONFIG.events[id].name])]],
     ['Horário da colônia',[['dawn','Amanhecer'],['noon','Meio-dia'],['sunset','Pôr do sol'],['night','Noite']]],
     ['Eventos da fazenda',['festival','boom','urgent','merchant','meteor'].map(id=>[id,CONFIG.events[id].name])],
     ['Minha fazenda',[['orchard','Amadurecer pomar'],['refill','Repor água e energia'],['irrigate','Irrigar cultivos e pomar'],['cure','Curar plantas doentes'],['sample','Induzir mutação em uma planta']]]
