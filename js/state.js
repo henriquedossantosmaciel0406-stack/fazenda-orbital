@@ -1,4 +1,5 @@
 // Estado global, barramento de eventos, calculos derivados e salvamento.
+import {techniques} from './field-abilities.js';
 import { queueSave } from './cloud.js';
 import { CONFIG } from './config.js';
 
@@ -76,6 +77,7 @@ export function enableOrbitalPass(pets) {
   state.prestige.stars=Math.max(9999,state.prestige.stars);
   state.prestige.total=Math.max(state.prestige.total,state.prestige.stars);
   for(const skill of CONFIG.prestige.perks)state.prestige.upgrades[skill.id]=skill.max+Math.max(0,state.prestige.rank-3);
+  state.prestige.abilities=Object.fromEntries(techniques.map(t=>[t.id,true]));
   state.rp=Math.max(9999,state.rp);
   state.speedLevel=CONFIG.upgrades.speed.max;
   state.yieldLevel=CONFIG.upgrades.yield.max;

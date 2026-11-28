@@ -1,3 +1,4 @@
+import {techniques,learnLock,learnTechnique,castTechnique} from './field-abilities.js';
 import {setSprite} from './pixel-sprites.js';
 // Prestigio ("Ascensao"): reinicia a fazenda em troca de Estrelas, gastas em melhorias permanentes
 // e que liberam plantas exclusivas. Conquistas, album, pets, recompensa diaria e configuracoes ficam.
@@ -6,7 +7,7 @@ import {planetAt} from './planets.js';
 import { CONFIG } from './config.js';
 import { settle } from './cloud.js';
 import { play } from './audio.js';
-import { openModal, refreshModal, updateHUD, row, section, makeTabs, showToast, openPauseMenu, progressBar } from './ui.js';
+import { openModal, closeModal, refreshModal, updateHUD, row, section, makeTabs, showToast, openPauseMenu, progressBar } from './ui.js';
 
 const P = () => CONFIG.prestige;
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -75,10 +76,11 @@ export async function ascend() {
   return true;
 }
 
-export function openPrestige() {
-  let confirming = false, selectedSkill='growth';
+export function openPrestige(start){
+  const quick=start==='techniques';
+  let confirming=false,selectedSkill=quick?(techniques.find(t=>state.prestige.abilities?.[t.id])||techniques[0]).id:'growth';
   openModal({
-    id: 'prestige', title: 'Prestígio', wide: true, hint: 'Pressione ESC para voltar',
+    id: 'prestige', initialTab:quick?1:0, title: 'Prestígio', wide: true, hint: 'Pressione ESC para voltar',
     build(body) {
       const p = state.prestige;
       body.append(el('p', 'hint', 'Ascensoes: ' + p.rank + '  |  Estrelas: ' + p.stars + '  |  Total ganho: ' + p.total));
@@ -170,15 +172,47 @@ function drawSkills(box, selected, remember){
     detail.replaceChildren(heading,el('span','grove-level','Nível '+lv+' / '+cap),el('p','',def.desc),action);
   }
   const pageOf=b=>b.page??(b.requires?1:0);
-  const page=pageOf(branches.find(b=>b.skills.includes(selected)));
+  const technique=techniques.find(t=>t.id===selected);
+  const page=technique?3:pageOf(branches.find(b=>b.skills.includes(selected)));
   const switcher=el('div','tabs');
-  for(const [i,label] of ['Fundamentos','Especializações','Maestrias'].entries()){
+  for(const [i,label] of ['Fundamentos','Especializações','Maestrias','Técnicas'].entries()){
     const button=el('button','tab'+(page===i?' active':''),label);
     button.type='button';button.setAttribute('aria-pressed',String(page===i));
-    button.onclick=()=>{remember(branches.find(b=>pageOf(b)===i).skills[0]);refreshModal();};
+    button.onclick=()=>{remember(i===3?techniques[0].id:branches.find(b=>pageOf(b)===i).skills[0]);refreshModal();};
     switcher.append(button);
   }
   box.append(switcher);
+  if(technique){
+    const p=state.prestige;
+    map.classList.add('technique-map');
+    for(const branch of ['Exploração','Lavoura']){
+      const lane=el('section','grove-lane');lane.append(el('h4','',branch));
+      for(const t of techniques.filter(t=>t.branch===branch)){
+        const learned=!!p.abilities?.[t.id];
+        const button=el('button','grove-rune '+(learned?'learned':learnLock(p,t)?'locked':'available'));
+        button.type='button';button.setAttribute('aria-label',t.name);
+        button.setAttribute('aria-pressed',String(t===technique));
+        const img=el('img');img.alt='';setSprite(img,'assets/items/'+t.icon+'.png');
+        button.append(img);button.onclick=()=>{remember(t.id);refreshModal();};lane.append(button);
+      }
+      map.append(lane);
+    }
+    const t=technique,owned=!!p.abilities?.[t.id],lock=learnLock(p,t);
+    const action=el('button','grove-learn',owned?'Usar técnica':lock||'Aprender · '+t.cost+' ★');
+    action.type='button';action.disabled=owned?state.mode!=='play':!!lock;
+    action.onclick=async()=>{
+      if(!owned){
+        if(learnTechnique(p,t)){save();play('buy');refreshModal();updateHUD();}
+        return;
+      }
+      const {useFieldTechnique}=await import('./game.js');
+      const result=castTechnique(t,p,useFieldTechnique);
+      if(result.error){showToast(result.error,'info');return;}
+      closeModal();save();play('upgrade');updateHUD();showToast(result.text,'good');
+    };
+    detail.append(el('h4','',t.name),el('span','grove-level','Recarga · '+t.seconds+' s'),el('p','',t.desc),action);
+    box.append(map,detail);return;
+  }
   for(const branch of branches.filter(b=>pageOf(b)===page)){
     const lane=el('section','grove-lane');
     lane.append(el('h4','',branch.name));

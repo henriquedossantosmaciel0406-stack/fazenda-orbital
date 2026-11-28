@@ -292,7 +292,7 @@ export function makeTabs(body, names) {
 export function openModal(opts) {
   const same = modal && modal.id === opts.id;
   const wasOpen = !!modal;
-  modal = { id: opts.id, title: opts.title, build: opts.build, opts, tab: same ? modal.tab : 0 };
+  modal = { id: opts.id, title: opts.title, build: opts.build, opts, tab: same ? modal.tab : (opts.initialTab||0) };
   state.paused = true;
   $('modalTitle').textContent = opts.title;
   $('modal').dataset.view=opts.id; $('modal').dataset.market=String(opts.title==='Mercado');
@@ -412,6 +412,7 @@ export function toggleInventory() {
 let adminSession=false;
 async function openAdmin(){
   if(!adminSession)return;
+  const {prankNames}=await import('./farm-pranks.js');
   const {netInfo,requestRoomAdmin}=await import('./net.js');
   const groups=[
     ['Atmosfera',[['clear','Abrir o céu'],...['tempest','rain','drought','solar','aurora','rainbow','dew','pollen','solstice'].map(id=>[id,CONFIG.events[id].name])]],
@@ -482,10 +483,11 @@ async function openAdmin(){
     body.append(section('Fazendas na sala'));
     const players=netInfo().remotes;
     if(!players.length)body.append(el('p','hint','Entre em uma sala com outro jogador para ajudar a fazenda dele.'));
+    if(players.length)body.append(el('p','hint','Escolha um amigo. Cada brincadeira aparece por 10 segundos na tela dele.'));
     for(const player of players){
-      body.append(row({title:player.nick,buttons:[['irrigate','Regar fazenda'],['cure','Curar cultivos']].map(([command,label])=>({
+      body.append(row({title:player.nick,buttons:[['irrigate','Regar fazenda'],['cure','Curar cultivos'],...Object.entries(prankNames)].map(([command,label])=>({
         label,onClick:async()=>{
-          try{await requestRoomAdmin({player:player.id,command});showToast('Ajuda enviada para '+player.nick,'good');}
+          try{await requestRoomAdmin({player:player.id,command});showToast(label+' · enviado para '+player.nick,'good');}
           catch(error){showToast(error.message,'bad');}
         }
       }))}));
@@ -737,6 +739,7 @@ export function bindUI(cb) {
   $('resume').addEventListener('click', () => { showResume(false); lockFn(); });
 
   addEventListener('keydown', e => {
+    if(e.code==='KeyK'&&!e.repeat&&state.mode==='play'&&!modal){openPrestige('techniques');return;}
     if (e.code === 'Escape' && modal) {
       // Esc volta ao menu de pausa quando estiver em submenu, ou fecha a janela
       if (state.mode === 'play' && ['settings', 'stats', 'achievements'].includes(modal.id)) openPauseMenu();

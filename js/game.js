@@ -1,3 +1,4 @@
+import {workField} from './field-abilities.js';
 import { cooperativeRows } from './prestige.js';
 import {CANS,canLevel,canEfficiency} from './gear.js';
 import {companion} from './actors.js';
@@ -1265,7 +1266,31 @@ export function initGame(sceneRef, cameraRef, worldRef) {
   return api;
 }
 
+let radar=null;
+export function useFieldTechnique(id){
+  return workField(id,{
+    plots:state.plots,position:camera.position,
+    ready:p=>p.crop&&p.progress>=CONFIG.crops[p.crop].growTime,
+    harvest:p=>stockFree()>0&&harvestPlot(p,false),
+    replant:p=>plantPlot(p,p.lastCrop,false),
+    mark:p=>{radar={plot:p,until:performance.now()+12000,next:0};},
+    home:()=>{
+      for(let r=0;r<=10;r+=2)for(let i=0;i<8;i++){
+        const x=-32+r*Math.cos(i*Math.PI/4),z=r*Math.sin(i*Math.PI/4);
+        if(!world.isWalkable(x,z))continue;
+        camera.position.set(x,CONFIG.player.height,z);pillar(x,z,0x76efff);
+        return {text:'Você voltou à entrada da fazenda.'};
+      }
+      return {error:'A entrada está bloqueada. Libere espaço para o salto.'};
+    }
+  });
+}
 export function updateGame(dt) {
+  if(radar){
+    const now=performance.now();
+    if(now>=radar.until||!radar.plot.crop)radar=null;
+    else if(now>=radar.next){pillar(radar.plot.x,radar.plot.z,0x87ffee,15);radar.next=now+450;}
+  }
   clock += dt; updateWater(dt);
   if(state.mode==='play')myPet.update(state.activePet,camera.position,dt,clock,world);
   wateringCan.update(dt,state.mode==='play' && !state.paused && HOTBAR[state.selectedSlot]?.type==='can',clock);

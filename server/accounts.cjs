@@ -136,6 +136,8 @@ module.exports=async function api(req,res,route,attempt=0){
       await issue(req,res,a,!!data.remember);return send(200,{...view(a),profile:req.archive?'archive':'main',recovery});
     }
     const {a,key}=await current(req);
+    if(route==='prank-ticket')return send(200,{ok:true,ticket:require('./pranks.cjs').issue(a,data)});
+    if(route==='prank-check')return send(200,{ok:true,prank:require('./pranks.cjs').verify(a,data.ticket)});
     if(route==='admin')return send(200,{ok:true,...adminAction(a,data)});
     if(route==='save'){
       if(data.nick!==a.nick||(data.profile&&data.profile!==(req.archive?'archive':'main')))throw fail(409,'A conta mudou em outra aba. Reabra o jogo.');

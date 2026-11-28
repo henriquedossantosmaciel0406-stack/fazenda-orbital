@@ -1,4 +1,5 @@
-import {visiting,hosted} from './cloud.js';
+import {startPrank,tickPrank,endPrank,prankNames} from './farm-pranks.js';
+import {visiting,hosted,api} from './cloud.js';
 import {makeFarmer,animateFarmer,companion,PETS} from './actors.js';
 import {canModel} from './watering-can.js';
 import {planetAt} from './planets.js';
@@ -311,6 +312,7 @@ function handle(fromId, m) {
   if (!m.id || m.id === N.myId) return;
   if (m.to) { // mensagem direta (presentes): o host entrega apenas ao destinatario
     if (m.to !== N.myId) { if (N.mode === 'host' && fromId) N.tr.sendTo(m.to, m); return; }
+    if(m.t==='prankTicket'){void acceptPrank(m.ticket);return;}
     if (m.t === 'gift') receiveGift(m); else if (m.t === 'giftok' || m.t === 'giftno') giftResult(m);
     return;
   }
@@ -480,6 +482,7 @@ function setupTransportHandlers() {
   return {
     onPeer() {},
     onAdmin(action){
+      if(action.prank){playPrank(action.prank);return;}
       if(action.assist==='irrigate'||action.assist==='cure'){
         for(const plot of state.plots)if(plot.crop){
           if(action.assist==='irrigate')plot.water=12;
@@ -510,7 +513,7 @@ export async function hostRoom() {
     if(!visiting && relayAddress() && !LOCAL){
       try{N.tr=await connectRelay('host',code,handlers);}
       catch(error){
-        if(!hosted || (error.status && error.status<500))throw error;
+        if(!hosted || (error.status && error.status<500 && error.status!==429))throw error;
         code='1'+code.slice(1);
         N.tr=await hostPeer(code,handlers);
       }
@@ -549,6 +552,7 @@ export async function joinRoom(code) {
 
 export function leave(silent) {
   if (N.mode === 'solo') return;
+  endPrank();usedTickets.clear();
   N.admission?.reject(new Error('Conexão encerrada antes de entrar na sala.'));
   try { send({ t: 'bye', id: N.myId }); } catch (e) { /* ignora */ }
   N.mode = 'solo';
@@ -561,7 +565,33 @@ export function leave(silent) {
   if (!silent) showToast('Voce saiu da sala', 'info');
 }
 
-export function requestRoomAdmin(action){
+const usedTickets=new Set();
+let checkingTicket=false;
+function playPrank(command){
+  if(!Object.hasOwn(prankNames,command))return;
+  startPrank(command,scene,camera,state.plots);showToast('Rick enviou: '+prankNames[command],'info');
+}
+async function acceptPrank(ticket){
+  if(checkingTicket||!N.code?.startsWith('1')||typeof ticket!=='string'||ticket.length>900||usedTickets.has(ticket))return;
+  checkingTicket=true;
+  try{
+    const result=await api('prank-check',{ticket});
+    const d=result.prank;
+    if(result.ok&&d.room===N.code&&d.peer===N.myId){
+      usedTickets.add(ticket);setTimeout(()=>usedTickets.delete(ticket),31000);
+      playPrank(d.command);
+    }
+  }finally{checkingTicket=false;}
+}
+export async function requestRoomAdmin(action){
+  if(N.code?.startsWith('1')&&Object.hasOwn(prankNames,action.command)){
+    const target=N.remotes.get(action.player),room=N.code;
+    if(!target)throw Error('Jogador saiu da sala.');
+    const result=await api('prank-ticket',{room,peer:target.id,nick:target.nick,command:action.command});
+    if(!result.ok)throw Error(result.error);
+    if(N.code!==room||N.remotes.get(target.id)!==target)throw Error('Jogador saiu da sala.');
+    sendTo(target.id,{t:'prankTicket',ticket:result.ticket});return;
+  }
   if((N.mode!=='guest'&&N.mode!=='host')||!N.tr?.admin)throw new Error('Use o servidor oficial da fazenda para controlar esta sala.');
   return N.tr.admin(action);
 }
@@ -652,10 +682,11 @@ export function openMultiplayer() {
           options.append(title,el('p','hint','Para usar o servidor Node do jogo, informe o mesmo endereço nos dois dispositivos. Deixe vazio para usar PeerJS.'),addr,confirm);
           body.append(options);
         }
-        body.append(el('p', 'hint', relayAddress() ? 'Use o mesmo servidor de salas nos dois dispositivos.' : 'Conexão pela internet (WebRTC). Na mesma rede, você também pode usar o servidor incluído no ZIP.'));
+        body.append(el('p', 'hint', hosted&&!visiting?'Servidor padrão: Upstash. Se estiver indisponível, a sala tenta conexão direta.':relayAddress() ? 'Use o mesmo servidor de salas nos dois dispositivos.' : 'Conexão pela internet (WebRTC). Na mesma rede, você também pode usar o servidor incluído no ZIP.'));
       } else {
         const code = el('div', 'mp-code', N.code);
         body.append(el('p', 'hint', N.mode === 'host' ? 'Voce e o host. Passe este codigo aos amigos:' : 'Conectado a sala:'), code);
+        if(hosted&&!visiting)body.append(el('p','hint',N.code.startsWith('1')?'Sala em conexão direta · reserva do Upstash':'Sala no Upstash · servidor padrão'));
         const list = el('div', 'list');
         list.append(row({ title: nickOf() + ' (voce)', desc: N.mode === 'host' ? 'Host - nivel ' + state.level : 'Nivel ' + state.level, tag: 'FAZENDA 1', tagCls: 'gold' }));
         for (const r of N.remotes.values()) list.append(row({ title: r.nick, desc: 'Nivel ' + (r.lvl || 1) + '  |  Fazenda a ' + (r.slot === 1 ? 'sul' : 'leste') + (r.slot === 2 ? ' (sudeste)' : '') + ' da cidade', tag: 'FAZENDA ' + (r.slot + 2), buttons: [
@@ -702,6 +733,7 @@ export function initNet(sceneRef, cameraRef, getNick, worldRef) {
 
 const tmpDir = new THREE.Vector3(), predicted = new THREE.Vector3();
 export function updateNet(dt) {
+  tickPrank();
   if (N.mode !== 'host' && N.mode !== 'guest') return;
   N.clock += dt;
   const play_ = state.mode === 'play';

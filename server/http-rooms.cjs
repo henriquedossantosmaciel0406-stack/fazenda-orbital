@@ -116,8 +116,10 @@ module.exports=async function handle(req,res){
         const {a}=await accounts.current(req);
         if(d.player){
           if(a.nick.toLowerCase()!=='rick')throw fail(403,'Apenas Rick pode ajudar outra fazenda.');
-          if(!identity.test(d.player)||!['irrigate','cure'].includes(d.command))throw fail(400,'Ajuda inválida.');
-          action={assist:d.command};
+          if(!identity.test(d.player))throw fail(400,'Jogador inválido.');
+          if(require('./pranks.cjs').allowed.has(d.command))action={prank:d.command};
+          else if(['irrigate','cure'].includes(d.command))action={assist:d.command};
+          else throw fail(400,'Comando desconhecido.');
         }else action=accounts.adminAction(a,d,true);
         nick=a.nick.toLowerCase();
       }

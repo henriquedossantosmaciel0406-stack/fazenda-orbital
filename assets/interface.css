@@ -88,3 +88,5 @@
 .daily-sprite{width:32px;height:32px;object-fit:contain;image-rendering:pixelated}.daily-day b{color:#b3cbce}.daily-day strong{color:#ffdf91;font:bold 12px monospace}
 #modal .daily-day.done{background:#2a4947}#modal .daily-day.next{border-color:#f3ca77;background:#4e4941}#modal .daily-day.big{box-shadow:inset 0 3px #cba56b}
 @media(max-width:600px){.daily-track{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.daily-day:last-child{grid-column:span 2}.grove-detail p,.grove-learn{grid-column:1/-1}.daily-sky{min-height:84px}}
+.technique-map{grid-template-columns:repeat(2,minmax(0,1fr))}
+.technique-map .grove-lane{grid-template-rows:auto repeat(2,52px)}
